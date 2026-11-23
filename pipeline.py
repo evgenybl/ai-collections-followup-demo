@@ -15,6 +15,9 @@ The steps, in order:
    only) are written. The run summary may be POSTed to an automation webhook (an n8n or Make trigger) on this
    computer. It carries stand-ins only.
 
+Each owing customer's ageing bucket (current, 1-30, 31-60, 61-90, over 90) is computed here from the largest delay
+among their open rows. It is never stored in the sheet, and the model is neither asked for it nor told it.
+
 There is no step that sends anything to a customer. Standard library only. Run: python -I pipeline.py --help
 Exit codes: 0 done; 2 refused (usage, a missing file, the sheet, a personal value in the request); 3 refused (the
 model's answer or the API cannot be used; nothing is written); 4 the outputs were written but the webhook failed.
@@ -45,6 +48,7 @@ DEFAULT_MODEL = "claude-haiku-5-5"
 DEFAULT_API_BASE = "https://api.anthropic.com"
 MAX_TOKENS = 4096
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+BUCKETS = ("current", "1-30", "31-60", "61-90", "over 90")
 
 PLAIN_AMOUNT = re.compile(r"[0-9]+(?:\.[0-9]+)?")   # 4200 or 4200.50; not 4,200, -5 or 1e3
 WHOLE_NUMBER = re.compile(r"[0-9]+")                 # 45; not 45.0
@@ -69,6 +73,19 @@ def money(value):
     if "." in text:
         text = text.rstrip("0").rstrip(".")
     return text
+
+
+def ageing_bucket(days):
+    """The ageing bucket of a delay in days: current (0), 1-30, 31-60, 61-90 or over 90."""
+    if days <= 0:
+        return "current"
+    if days <= 30:
+        return "1-30"
+    if days <= 60:
+        return "31-60"
+    if days <= 90:
+        return "61-90"
+    return "over 90"
 
 
 def read_file(path, what):
@@ -133,14 +150,18 @@ def numbers_in(text, stand_ins):
 
 
 def expected_by_customer(clean_rows, key):
-    """Per stand-in, from the sheet itself: the total debt, the largest delay, every figure of the customer's own rows
-    (each amount and delay, and the total), and the stand-ins those rows hold."""
+    """Per stand-in, from the sheet itself: the total debt, the largest delay, the largest delay among the open rows
+    (an amount above 0; the ageing bucket comes from it), every figure of the customer's own rows (each amount and
+    delay, and the total), and the stand-ins those rows hold."""
     out = {}
     for row in clean_rows:
         amount, days = Decimal(row[AMOUNT].strip()), int(row[DAYS].strip())
-        c = out.setdefault(row[NAME], {"total": Decimal(0), "days": 0, "figures": set(), "stand_ins": set()})
+        c = out.setdefault(row[NAME], {"total": Decimal(0), "days": 0, "open_days": 0, "figures": set(),
+                                       "stand_ins": set()})
         c["total"] += amount
         c["days"] = max(c["days"], days)
+        if amount > 0:
+            c["open_days"] = max(c["open_days"], days)
         c["figures"] |= {amount, Decimal(days)}
         for value in row.values():
             if isinstance(value, str):
@@ -424,8 +445,31 @@ def webhook_result(url, payload, allow_remote):
     return status if 200 <= status < 300 else f"failed: HTTP {status}"
 
 
+def bucket_of(c):
+    """The ageing bucket of one customer of expected_by_customer."""
+    return ageing_bucket(c["open_days"])
+
+
+def ageing(expected):
+    """What is owed, per bucket: the owing customers (stand-ins) and their total."""
+    out = []
+    for bucket in BUCKETS:
+        who = sorted(w for w, c in expected.items() if c["total"] > 0 and bucket_of(c) == bucket)
+        out.append({"bucket": bucket, "customers": who,
+                    "total": money(sum((expected[w]["total"] for w in who), Decimal(0)))})
+    return out
+
+
+def write_text(path, text):
+    """Write UTF-8 with LF line ends on every system, so that a file's sha256 does not depend on the system that
+    wrote it, and return that sha256."""
+    data = text.encode("utf-8")
+    path.write_bytes(data)
+    return hashlib.sha256(data).hexdigest()
+
+
 def write_json(path, data):
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    return write_text(path, json.dumps(data, ensure_ascii=False, indent=1) + "\n")
 
 
 def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook=False):
@@ -442,29 +486,30 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
     out_dir.mkdir(parents=True)
     with (out_dir / "call-list.csv").open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["priority", "customer", "amount", "days_late", "reason"])
+        w.writerow(["priority", "customer", "amount", "days_late", "bucket", "reason"])
         for a in accepted:
             w.writerow([a["priority"], pseudonymise.restore(a["customer"], key), money(a["amount"]), a["days_late"],
-                        pseudonymise.restore(a["reason"], key)])
+                        bucket_of(prep["expected"][a["customer"]]), pseudonymise.restore(a["reason"], key)])
     rem = out_dir / "reminders"
     rem.mkdir()
     for a in accepted:
-        (rem / f"reminder-{a['priority']:02d}.txt").write_text(
-            pseudonymise.restore(a["reminder"], key) + "\n", encoding="utf-8")
-    (out_dir / "for-a-person.txt").write_text(
-        page_for_a_person(rejected, missing, notes, rejected_notes, key) + "\n", encoding="utf-8")
+        write_text(rem / f"reminder-{a['priority']:02d}.txt", pseudonymise.restore(a["reminder"], key) + "\n")
+    write_text(out_dir / "for-a-person.txt", page_for_a_person(rejected, missing, notes, rejected_notes, key) + "\n")
+    owing = {who: c for who, c in prep["expected"].items() if c["total"] > 0}
     report = {
         "backend": backend.name,
         "model": backend.model,
         "request_sha256": hashlib.sha256(prep["request"].encode("utf-8")).hexdigest(),
         "personal_values_in_request": len(prep["leaked"]),
-        "customers_owing": len([1 for c in prep["expected"].values() if c["total"] > 0]),
+        "customers_owing": len(owing),
         "accepted": len(accepted),
         "rejected": rejected,
         "missing_from_answer": missing,
         "for_a_human": notes,
         "rejected_notes": rejected_notes,
         "sent_to_customers": 0,  # there is no send step
+        "total_owed": money(sum((c["total"] for c in owing.values()), Decimal(0))),
+        "ageing": ageing(prep["expected"]),
     }
     write_json(out_dir / "run-report.json", report)
     if webhook:

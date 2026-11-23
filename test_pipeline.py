@@ -467,8 +467,8 @@ class MoneyTest(TempTest):
         report = pipeline.run(sheet, PROMPT, pipeline.RecordedBackend(self.write("a.json", self.ANSWER)), out)
         self.assertEqual((report["accepted"], report["rejected"]), (3, []))
         lines = (out / "call-list.csv").read_text(encoding="utf-8-sig").splitlines()
-        self.assertEqual(lines[1:], ["1,Big Debtor,1234567.89,30,largest", "2,Mid Debtor,12345.67,10,middle",
-                                     "3,Small Debtor,0.3,5,two small invoices of 0.1 and 0.2"])
+        self.assertEqual(lines[1:], ["1,Big Debtor,1234567.89,30,1-30,largest", "2,Mid Debtor,12345.67,10,1-30,middle",
+                                     "3,Small Debtor,0.3,5,1-30,two small invoices of 0.1 and 0.2"])
 
     def test_a_rejection_quotes_amounts_exactly(self):
         prep = pipeline.prepare(self.write("sheet.csv", self.SHEET_TEXT), PROMPT)
