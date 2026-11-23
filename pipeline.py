@@ -1,0 +1,520 @@
+"""An AI collections follow-up pipeline with a model API call and an automation webhook (synthetic data only).
+
+The steps, in order:
+1. The sheet is checked: the four needed columns are there, every row has a name, every amount is a plain decimal
+   number and every delay a whole number. A sheet that fails is refused before anything is sent.
+2. The personal columns are replaced with stand-ins and the notes are scrubbed (pseudonymise.py). A guard refuses
+   the run if a personal value of the sheet is still in the request.
+3. Only the columns the task needs (the stand-in name, the debt, the days late, the cleaned notes) go to a model,
+   with the fixed prompt in prompt.txt. The backend is a recorded answer, or the Anthropic Messages API.
+4. The answer must be JSON in a fixed shape. Every figure it writes in digits must match the sheet, and every
+   stand-in in it must belong where it is used. An item that fails is rejected and listed for a person to check; a
+   customer the model left out is listed too, and so is a note for a person that fails.
+5. The stand-ins are mapped back to the real names on this computer only.
+6. The call list, one reminder draft per customer, a page for a person (real names) and a run report (stand-ins
+   only) are written. The run summary may be POSTed to an automation webhook (an n8n or Make trigger) on this
+   computer. It carries stand-ins only.
+
+There is no step that sends anything to a customer. Standard library only. Run: python -I pipeline.py --help
+Exit codes: 0 done; 2 refused (usage, a missing file, the sheet, a personal value in the request); 3 refused (the
+model's answer or the API cannot be used; nothing is written); 4 the outputs were written but the webhook failed.
+"""
+import argparse
+import csv
+import hashlib
+import http.client
+import io
+import json
+import os
+import pathlib
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from decimal import Decimal
+
+HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import pseudonymise  # noqa: E402
+
+NAME, AMOUNT, DAYS, NOTES = "name", "amount_due", "days_late", "notes"
+MODEL_COLUMNS = [NAME, AMOUNT, DAYS, NOTES]
+API_KEY_ENV = "ANTHROPIC_API_KEY"
+DEFAULT_MODEL = "claude-haiku-5-5"
+DEFAULT_API_BASE = "https://api.anthropic.com"
+MAX_TOKENS = 4096
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+PLAIN_AMOUNT = re.compile(r"[0-9]+(?:\.[0-9]+)?")   # 4200 or 4200.50; not 4,200, -5 or 1e3
+WHOLE_NUMBER = re.compile(r"[0-9]+")                 # 45; not 45.0
+NUMBER = re.compile(r"\d+(?:,\d{3})*(?:\.\d+)?")     # a figure in a text: 950, 12,800 or 12800.50
+# Text shaped like a stand-in, such as "Customer 003" or "ID 777". Whether it is one is decided by this run's key,
+# never by the shape: a shaped token that is not in the key is an unknown stand-in.
+STAND_IN_SHAPE = re.compile(
+    r"(?<!\w)(?:" + "|".join(re.escape(label) for label in pseudonymise.PERSONAL.values()) + r") \d+(?!\w)")
+
+
+class PipelineError(Exception):
+    """A refusal with an exit code: 2 for a usage or setup problem, 3 for an answer that cannot be used."""
+
+    def __init__(self, message, code):
+        super().__init__(message)
+        self.code = code
+
+
+def money(value):
+    """An amount in plain notation: no exponent, no trailing zeros in the fraction (12800, 12345.67, 0.3)."""
+    text = format(Decimal(value), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text
+
+
+def read_file(path, what):
+    """The text of a file, or a refusal (exit 2) that names it."""
+    try:
+        return pathlib.Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise PipelineError(f"cannot read {what}: {exc}", 2)
+
+
+def load_sheet(path):
+    """Read the sheet and check it before anything is sent. Refused (exit 2): a missing or unreadable file, a missing
+    column (the names must match exactly), an empty name, an amount that is not a plain decimal number of 0 or more,
+    a delay that is not a whole number of 0 or more."""
+    try:
+        with pathlib.Path(path).open(encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            rows, columns = list(reader), list(reader.fieldnames or [])
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        raise PipelineError(f"cannot read the sheet: {exc}", 2)
+    for col in MODEL_COLUMNS:
+        if col not in columns:
+            raise PipelineError(f"the sheet has no column {col!r} (column names must match exactly)", 2)
+    for number, row in enumerate(rows, start=2):  # row 1 is the header
+        where = f"row {number} of the sheet"
+        if not (row.get(NAME) or "").strip():
+            raise PipelineError(f"{where}: the name is empty", 2)
+        if not PLAIN_AMOUNT.fullmatch((row.get(AMOUNT) or "").strip()):
+            raise PipelineError(f"{where}: {AMOUNT} {row.get(AMOUNT)!r} is not a plain decimal number of 0 or more", 2)
+        if not WHOLE_NUMBER.fullmatch((row.get(DAYS) or "").strip()):
+            raise PipelineError(f"{where}: {DAYS} {row.get(DAYS)!r} is not a whole number of 0 or more", 2)
+    return rows, columns
+
+
+def model_table(clean_rows):
+    """The CSV text the model sees: the four needed columns of the pseudonymised rows, nothing else. A line break
+    inside a cell becomes a space; a quote is kept, as CSV quoting."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(MODEL_COLUMNS)
+    for row in clean_rows:
+        writer.writerow([re.sub(r"\r\n|\r|\n", " ", row.get(col) or "") for col in MODEL_COLUMNS])
+    return buffer.getvalue()
+
+
+def build_request(prompt, clean_rows):
+    return prompt.strip() + "\n\nThe table:\n\n" + model_table(clean_rows)
+
+
+def stand_ins_in(text, key):
+    """The stand-in shaped tokens of a text, as two sets: those in this run's key, and the unknown ones."""
+    found = {m.group(0) for m in STAND_IN_SHAPE.finditer(text)}
+    return found & key.keys(), found - key.keys()
+
+
+def numbers_in(text, stand_ins):
+    """The figures a text states in digits, after the given stand-ins (exact tokens, whose numbering is not a figure)
+    are taken out. Any other digits count, so an unknown stand-in cannot hide a figure."""
+    for token in stand_ins:
+        text = re.sub(r"(?<!\w)" + re.escape(token) + r"(?!\w)", " ", text)
+    return {Decimal(n.replace(",", "")) for n in NUMBER.findall(text)}
+
+
+def expected_by_customer(clean_rows, key):
+    """Per stand-in, from the sheet itself: the total debt, the largest delay, every figure of the customer's own rows
+    (each amount and delay, and the total), and the stand-ins those rows hold."""
+    out = {}
+    for row in clean_rows:
+        amount, days = Decimal(row[AMOUNT].strip()), int(row[DAYS].strip())
+        c = out.setdefault(row[NAME], {"total": Decimal(0), "days": 0, "figures": set(), "stand_ins": set()})
+        c["total"] += amount
+        c["days"] = max(c["days"], days)
+        c["figures"] |= {amount, Decimal(days)}
+        for value in row.values():
+            if isinstance(value, str):
+                c["stand_ins"] |= stand_ins_in(value, key)[0]
+    for c in out.values():
+        c["figures"].add(c["total"])
+    return out
+
+
+def personal_values(rows):
+    values = set()
+    for row in rows:
+        for col in pseudonymise.PERSONAL:
+            value = (row.get(col) or "").strip()
+            if value:
+                values.add(value)
+    return values
+
+
+def prepare(sheet, prompt_path):
+    """Everything before the model call: check the sheet, replace the personal columns, build the request, guard it.
+    Nothing is sent here."""
+    rows, columns = load_sheet(sheet)
+    clean, key = pseudonymise.pseudonymise(rows, columns)
+    for row, out in zip(rows, clean):
+        # The two figure columns were checked as plain numbers. They go to the model as written, so the scrub of
+        # nine-digit numbers can never change an amount.
+        out[AMOUNT], out[DAYS] = row[AMOUNT].strip(), row[DAYS].strip()
+    request_text = build_request(read_file(prompt_path, "the prompt"), clean)
+    lowered = request_text.lower()
+    leaked = sorted(v for v in personal_values(rows) if v.lower() in lowered)
+    if leaked:
+        raise PipelineError(f"{len(leaked)} personal value(s) would reach the model; nothing was sent", 2)
+    return {"clean": clean, "key": key, "request": request_text, "leaked": leaked,
+            "expected": expected_by_customer(clean, key)}
+
+
+class RecordedBackend:
+    """A saved model answer, read from a file. A missing or unreadable file is refused (exit 2)."""
+
+    name = "recorded"
+
+    def __init__(self, path):
+        self.path = pathlib.Path(path)
+        self.model = f"recorded:{self.path.name}"
+
+    def complete(self, request_text):
+        return read_file(self.path, "the recorded answer")
+
+
+class AnthropicBackend:
+    """The Anthropic Messages API over HTTPS. The key comes from the environment and is never printed or written.
+    Any failure is refused (exit 3) before anything is written."""
+
+    name = "anthropic"
+
+    def __init__(self, model=DEFAULT_MODEL, api_base=DEFAULT_API_BASE, timeout=60):
+        self.model = model
+        self.api_base = api_base.rstrip("/")
+        self.timeout = timeout
+        self.key = os.environ.get(API_KEY_ENV, "")
+        if not self.key:
+            raise PipelineError(f"no API key in {API_KEY_ENV}; use --backend recorded, or set the variable", 2)
+
+    def complete(self, request_text):
+        body = json.dumps({
+            "model": self.model,
+            "max_tokens": MAX_TOKENS,
+            "messages": [{"role": "user", "content": request_text}],
+        }, ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(self.api_base + "/v1/messages", data=body, method="POST", headers={
+            "content-type": "application/json",
+            "anthropic-version": "2023-06-01",
+            "x-api-key": self.key,
+        })
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                raw = resp.read()
+        except urllib.error.HTTPError as exc:
+            exc.close()
+            raise PipelineError(f"the API answered with HTTP status {exc.code}", 3)
+        except (OSError, http.client.HTTPException) as exc:
+            raise PipelineError(f"the API could not be reached: {getattr(exc, 'reason', None) or exc}", 3)
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except ValueError:
+            raise PipelineError("the API answer is not JSON", 3)
+        if not isinstance(data, dict) or not isinstance(data.get("content"), list):
+            raise PipelineError("the API answer is not in the shape of the Messages API", 3)
+        if data.get("stop_reason") == "max_tokens":
+            raise PipelineError(f"the answer was cut off at max_tokens ({MAX_TOKENS})", 3)
+        texts = [b.get("text") for b in data["content"] if isinstance(b, dict) and b.get("type") == "text"]
+        if not texts or not all(isinstance(t, str) for t in texts):
+            raise PipelineError("the API answer carried no text block", 3)
+        return "".join(texts)
+
+
+def refuse_constant(name):
+    raise ValueError(f"{name} is not a number this pipeline accepts")
+
+
+def parse_answer(text):
+    """Accept the JSON object even inside a code fence; refuse anything else. A number with a fraction is read as a
+    Decimal, so amounts compare exactly; NaN and Infinity are refused."""
+    body = text.strip()
+    fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", body, re.S)
+    if fence:
+        body = fence.group(1)
+    try:
+        data = json.loads(body, parse_float=Decimal, parse_constant=refuse_constant)
+    except json.JSONDecodeError as exc:
+        raise PipelineError(f"the answer is not JSON: {exc.msg} at character {exc.pos}", 3)
+    except ValueError as exc:
+        raise PipelineError(f"the answer cannot be used: {exc}", 3)
+    if not isinstance(data, dict) or not isinstance(data.get("call_list"), list):
+        raise PipelineError("the answer has no call_list, or its call_list is not a list", 3)
+    if not isinstance(data.get("for_a_human", []), list):
+        raise PipelineError("for_a_human is not a list", 3)
+    return data
+
+
+def is_amount(value):
+    """A finite number from the JSON: an int or a Decimal, not a bool and not a string."""
+    return isinstance(value, (int, Decimal)) and not isinstance(value, bool) and Decimal(value).is_finite()
+
+
+def is_whole(value):
+    """A JSON integer: not a bool, and not a number written with a fraction such as 90.0."""
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def listed(values, show=str):
+    return ", ".join(show(v) for v in sorted(values))
+
+
+def reminder_problem(reminder, who, c, key):
+    """A reminder goes to one customer: it may name only that customer, may state only the total and the days late,
+    and must state the total."""
+    if not isinstance(reminder, str) or not reminder.strip():
+        return "the reminder is missing or empty"
+    known, unknown = stand_ins_in(reminder, key)
+    if unknown:
+        return "the reminder holds an unknown stand-in: " + listed(unknown)
+    if known - {who}:
+        return "the reminder names a stand-in other than this customer: " + listed(known - {who})
+    figures = numbers_in(reminder, {who})
+    extra = figures - {c["total"], Decimal(c["days"])}
+    if extra:
+        return "the reminder states a figure other than the total and the days late: " + listed(extra, money)
+    if c["total"] not in figures:
+        return f"the reminder does not state the total {money(c['total'])}"
+    return None
+
+
+def reason_problem(reason, c, key):
+    """A reason may name only this customer and the stand-ins in their own rows, and state only their own figures."""
+    if not isinstance(reason, str):
+        return "the reason is missing or not a text"
+    known, unknown = stand_ins_in(reason, key)
+    if unknown:
+        return "the reason holds an unknown stand-in: " + listed(unknown)
+    if known - c["stand_ins"]:
+        return "the reason names a stand-in from outside this customer's rows: " + listed(known - c["stand_ins"])
+    extra = numbers_in(reason, known) - c["figures"]
+    if extra:
+        return "the reason states a figure that is not one of this customer's: " + listed(extra, money)
+    return None
+
+
+def note_problem(note, sheet_figures, key):
+    """A note for a person may name any stand-in of this run, and state only figures that are in the sheet."""
+    if not isinstance(note, str):
+        return "the note is not a text"
+    known, unknown = stand_ins_in(note, key)
+    if unknown:
+        return "the note holds an unknown stand-in: " + listed(unknown)
+    extra = numbers_in(note, known) - sheet_figures
+    if extra:
+        return "the note states a figure that is not in the sheet: " + listed(extra, money)
+    return None
+
+
+def item_problem(item, expected, seen, priorities, key):
+    """Why a call-list item cannot be accepted, or None when every check passes."""
+    who = item.get("customer")
+    amount, days, priority = item.get("amount"), item.get("days_late"), item.get("priority")
+    if not isinstance(who, str) or who not in expected:
+        return "this customer is not in the sheet"
+    c = expected[who]
+    if c["total"] <= 0:
+        return "the sheet shows nothing owed"
+    if who in seen:
+        return "the same customer appears twice"
+    if not is_amount(amount):
+        return "the amount is missing or not a finite number"
+    if not is_whole(days):
+        return "days_late is missing or not a whole number"
+    if not is_whole(priority):
+        return "priority is missing or not a whole number"
+    if amount != c["total"]:
+        return f"the amount {money(amount)} does not match the sheet's total {money(c['total'])}"
+    if days != c["days"]:
+        return f"days late {days} does not match the sheet's {c['days']}"
+    if priority < 1 or priority in priorities:
+        return "the priority is repeated or below 1"
+    return reminder_problem(item.get("reminder"), who, c, key) or reason_problem(item.get("reason"), c, key)
+
+
+def validate(answer, expected, key):
+    """Split the call list into accepted and rejected items, each rejection with its reason, and list who is missing.
+    Split the notes for a person into accepted and rejected the same way.
+    Returns (accepted, rejected, missing, notes, rejected_notes)."""
+    accepted, rejected, seen, priorities = [], [], set(), set()
+    for item in answer["call_list"]:
+        if not isinstance(item, dict):
+            rejected.append({"item": str(item)[:80], "reason": "not an object"})
+            continue
+        problem = item_problem(item, expected, seen, priorities, key)
+        if problem:
+            rejected.append({"customer": str(item.get("customer", ""))[:80], "reason": problem})
+            continue
+        who = item["customer"]
+        seen.add(who)
+        priorities.add(item["priority"])
+        # The amount kept is the sheet's own total, which the check has just proved equal to the model's.
+        accepted.append({"customer": who, "priority": item["priority"], "amount": expected[who]["total"],
+                         "days_late": item["days_late"], "reason": item["reason"], "reminder": item["reminder"]})
+    accepted.sort(key=lambda a: a["priority"])
+    owing = {who for who, c in expected.items() if c["total"] > 0}
+    missing = sorted(owing - seen - {r.get("customer") for r in rejected})
+    sheet_figures = set().union(*(c["figures"] for c in expected.values()))
+    notes, rejected_notes = [], []
+    for note in answer.get("for_a_human", []):
+        problem = note_problem(note, sheet_figures, key)
+        if problem:
+            rejected_notes.append({"note": str(note), "reason": problem})
+        else:
+            notes.append(note)
+    return accepted, rejected, missing, notes, rejected_notes
+
+
+def page_for_a_person(rejected, missing, notes, rejected_notes, key):
+    """The page a person reads after the run, with the real names restored. It stays on this computer."""
+    def section(title, entries):
+        return [title] + ([f"- {e}" for e in entries] or ["- none"]) + [""]
+
+    lines = ["For a person to read. It holds real names: keep it on this computer.", ""]
+    lines += section("Notes from the model:", notes)
+    lines += section("Items rejected by the checks (not in the call list):",
+                     [f"{r.get('customer', r.get('item'))}: {r['reason']}" for r in rejected])
+    lines += section("Customers who owe money and are missing from the answer:", missing)
+    lines += section("Notes rejected by the checks:", [f"{r['note']} ({r['reason']})" for r in rejected_notes])
+    return pseudonymise.restore("\n".join(lines), key)
+
+
+def check_webhook(url, allow_remote):
+    host = urllib.parse.urlparse(url).hostname or ""
+    if host not in LOCAL_HOSTS and not allow_remote:
+        raise PipelineError(f"refusing a webhook outside this computer ({host}); pass --allow-remote-webhook only "
+                            "with the approval of the owner of the data", 2)
+
+
+def post_webhook(url, payload, allow_remote=False, timeout=15):
+    """POST the payload and return the HTTP status. A failure raises OSError or http.client.HTTPException."""
+    check_webhook(url, allow_remote)
+    req = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), method="POST",
+                                 headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.status
+
+
+def webhook_result(url, payload, allow_remote):
+    """The HTTP status on success, or the text "failed: <short reason>"; the run's outputs are kept either way."""
+    try:
+        status = post_webhook(url, payload, allow_remote)
+    except urllib.error.HTTPError as exc:
+        exc.close()
+        return f"failed: HTTP {exc.code}"
+    except (OSError, http.client.HTTPException) as exc:
+        return f"failed: {getattr(exc, 'reason', None) or exc}"
+    return status if 200 <= status < 300 else f"failed: HTTP {status}"
+
+
+def write_json(path, data):
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+
+def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook=False):
+    out_dir = pathlib.Path(out_dir)
+    if out_dir.exists():
+        raise PipelineError(f"refusing to write into an existing folder: {out_dir}", 2)
+    if webhook:
+        check_webhook(webhook, allow_remote_webhook)
+    prep = prepare(sheet, prompt_path)
+    key = prep["key"]
+    answer = parse_answer(backend.complete(prep["request"]))
+    accepted, rejected, missing, notes, rejected_notes = validate(answer, prep["expected"], key)
+
+    out_dir.mkdir(parents=True)
+    with (out_dir / "call-list.csv").open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["priority", "customer", "amount", "days_late", "reason"])
+        for a in accepted:
+            w.writerow([a["priority"], pseudonymise.restore(a["customer"], key), money(a["amount"]), a["days_late"],
+                        pseudonymise.restore(a["reason"], key)])
+    rem = out_dir / "reminders"
+    rem.mkdir()
+    for a in accepted:
+        (rem / f"reminder-{a['priority']:02d}.txt").write_text(
+            pseudonymise.restore(a["reminder"], key) + "\n", encoding="utf-8")
+    (out_dir / "for-a-person.txt").write_text(
+        page_for_a_person(rejected, missing, notes, rejected_notes, key) + "\n", encoding="utf-8")
+    report = {
+        "backend": backend.name,
+        "model": backend.model,
+        "request_sha256": hashlib.sha256(prep["request"].encode("utf-8")).hexdigest(),
+        "personal_values_in_request": len(prep["leaked"]),
+        "customers_owing": len([1 for c in prep["expected"].values() if c["total"] > 0]),
+        "accepted": len(accepted),
+        "rejected": rejected,
+        "missing_from_answer": missing,
+        "for_a_human": notes,
+        "rejected_notes": rejected_notes,
+        "sent_to_customers": 0,  # there is no send step
+    }
+    write_json(out_dir / "run-report.json", report)
+    if webhook:
+        # Stand-ins only. Amounts are strings in plain notation, so no figure is rounded on the way.
+        summary = {"event": "collections-run", "accepted": [{"customer": a["customer"], "priority": a["priority"],
+                   "amount": money(a["amount"])} for a in accepted], "rejected": len(rejected), "missing": missing}
+        report["webhook_status"] = webhook_result(webhook, summary, allow_remote_webhook)
+        write_json(out_dir / "run-report.json", report)
+    return report
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--sheet", default=str(HERE / "customers.synthetic.csv"))
+    ap.add_argument("--prompt", default=str(HERE / "prompt.txt"))
+    ap.add_argument("--backend", choices=["recorded", "anthropic"], default="recorded")
+    ap.add_argument("--recorded", default=str(HERE / "recorded-answer.json"), help="the recorded model answer")
+    ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--api-base", default=DEFAULT_API_BASE)
+    ap.add_argument("--out", help="a folder that does not exist yet (not needed with --print-request)")
+    ap.add_argument("--webhook", help="an automation trigger URL on this computer (n8n or Make style)")
+    ap.add_argument("--allow-remote-webhook", action="store_true")
+    ap.add_argument("--print-request", action="store_true", help="print the exact text the model would get, then stop")
+    args = ap.parse_args(argv)
+    if not args.out and not args.print_request:
+        ap.error("--out is required, except with --print-request")
+    try:
+        if args.print_request:
+            request_text = prepare(args.sheet, args.prompt)["request"]
+            sys.stdout.flush()
+            sys.stdout.buffer.write(request_text.encode("utf-8"))  # the exact bytes: UTF-8, LF line ends
+            sys.stdout.buffer.flush()
+            return 0
+        if args.backend == "recorded":
+            backend = RecordedBackend(args.recorded)
+        else:
+            backend = AnthropicBackend(args.model, args.api_base)
+        report = run(args.sheet, args.prompt, backend, args.out, args.webhook, args.allow_remote_webhook)
+    except PipelineError as exc:
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return exc.code
+    status = report.get("webhook_status")
+    line = (f"backend {report['backend']} | owing {report['customers_owing']} | accepted {report['accepted']} | "
+            f"rejected {len(report['rejected'])} | missing {len(report['missing_from_answer'])} | "
+            f"rejected notes {len(report['rejected_notes'])} | sent to customers {report['sent_to_customers']}")
+    if status is not None:
+        line += f" | webhook {status}"
+    print(line)
+    return 4 if isinstance(status, str) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
