@@ -1,0 +1,6 @@
+{
+ "model": "claude-haiku-5-5",
+ "recorded_on": "2026-11-23",
+ "route": "a Claude Code subagent on that model, given the request text as its whole prompt; the answer is saved unedited",
+ "request_sha256": "9dc14b201c13d16f7df66d35a113c6bea5c52c87820b9816cedf51514635ab25"
+}

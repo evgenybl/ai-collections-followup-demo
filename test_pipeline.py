@@ -1,6 +1,6 @@
-"""Tests of the pipeline and the pseudonymiser, on the synthetic sheet beside them and on small sheets written by the
+"""Tests of the pipeline and the pseudonymiser, on the six-row sheet in fixtures/ and on small sheets written by the
 tests themselves. No network outside this computer: the API and the webhook are local mock servers.
-Run: python -I test_pipeline.py"""
+Run: python -I test_pipeline.py  (every test file: python -I run_tests.py)"""
 import contextlib
 import csv
 import hashlib
@@ -22,10 +22,12 @@ sys.path.insert(0, str(HERE))
 import pipeline  # noqa: E402
 import pseudonymise  # noqa: E402
 
-SHEET = HERE / "customers.synthetic.csv"
+# The six-row sheet and the real model answer recorded for it are kept in fixtures/, so that these tests run on the
+# data they were written for. The shipped sheet is generated now (make_sheet.py); test_sheet.py covers it.
+SHEET = HERE / "fixtures" / "customers.six-rows.csv"
 PROMPT = HERE / "prompt.txt"
-RECORDED = HERE / "recorded-answer.json"
-META = HERE / "recorded-answer.meta.json"
+RECORDED = HERE / "fixtures" / "recorded-answer.six-rows.json"
+META = HERE / "fixtures" / "recorded-answer.six-rows.meta.json"
 TEST_KEY = "unit" + "-" + "test" + "-" + "placeholder"
 
 
@@ -174,8 +176,8 @@ class RequestTest(unittest.TestCase):
         self.assertEqual(parsed[1], ["Customer 001", "5", "1", 'Said "next week", then hung up again'])
 
     def test_print_request_prints_the_exact_request_and_needs_no_out(self):
-        proc = subprocess.run([sys.executable, "-I", "-B", str(HERE / "pipeline.py"), "--print-request"],
-                              capture_output=True, timeout=60)
+        proc = subprocess.run([sys.executable, "-I", "-B", str(HERE / "pipeline.py"), "--print-request",
+                               "--sheet", str(SHEET)], capture_output=True, timeout=60)
         request = pipeline.prepare(SHEET, PROMPT)["request"]
         self.assertEqual((proc.returncode, proc.stdout), (0, request.encode("utf-8")))
         code, _, err = call_main(pipeline, [])
@@ -617,7 +619,8 @@ class RunTest(TempTest):
         server = MockServer("", status=500)
         out = self.base / "wf"
         try:
-            code, printed, _ = call_main(pipeline, ["--recorded", str(self.answer_file(good_answer())),
+            code, printed, _ = call_main(pipeline, ["--sheet", str(SHEET),
+                                                    "--recorded", str(self.answer_file(good_answer())),
                                                     "--out", str(out), "--webhook", server.url + "/hook"])
         finally:
             server.close()
@@ -627,7 +630,8 @@ class RunTest(TempTest):
         self.assertEqual((report["webhook_status"], report["accepted"]), ("failed: HTTP 500", 4))
         self.assertTrue((out / "call-list.csv").is_file())
         self.assertTrue((out / "for-a-person.txt").is_file())
-        code, printed, _ = call_main(pipeline, ["--recorded", str(self.answer_file(good_answer())),
+        code, printed, _ = call_main(pipeline, ["--sheet", str(SHEET),
+                                                "--recorded", str(self.answer_file(good_answer())),
                                                 "--out", str(self.base / "wc"), "--webhook", closed_port_url()])
         self.assertEqual(code, 4)
         self.assertIn("| webhook failed: ", printed)
