@@ -18,12 +18,19 @@ The steps, in order:
 Each owing customer's ageing bucket (current, 1-30, 31-60, 61-90, over 90) is computed here from the largest delay
 among their open rows. It is never stored in the sheet, and the model is neither asked for it nor told it.
 
+With --history, a run reads the run history that approval.py export writes. A customer exported inside the window
+(--window-days before --as-of) with the same total is left out of the request and listed as already drafted; one
+whose total changed is drafted again and marked. When every owing customer is already drafted, the model is not
+called at all. Without --history, every owing customer is asked about, as before.
+
 There is no step that sends anything to a customer. Standard library only. Run: python -I pipeline.py --help
-Exit codes: 0 done; 2 refused (usage, a missing file, the sheet, a personal value in the request); 3 refused (the
-model's answer or the API cannot be used; nothing is written); 4 the outputs were written but the webhook failed.
+Exit codes: 0 done; 2 refused (usage, a missing file, the sheet, a corrupt history line, a personal value in the
+request); 3 refused (the model's answer or the API cannot be used; nothing is written); 4 the outputs were written
+but the webhook failed.
 """
 import argparse
 import csv
+import datetime
 import hashlib
 import http.client
 import io
@@ -42,6 +49,7 @@ sys.path.insert(0, str(HERE))
 import pseudonymise  # noqa: E402
 
 NAME, AMOUNT, DAYS, NOTES = "name", "amount_due", "days_late", "notes"
+ID_NUMBER = "id_number"
 MODEL_COLUMNS = [NAME, AMOUNT, DAYS, NOTES]
 API_KEY_ENV = "ANTHROPIC_API_KEY"
 DEFAULT_MODEL = "claude-haiku-5-5"
@@ -49,10 +57,15 @@ DEFAULT_API_BASE = "https://api.anthropic.com"
 MAX_TOKENS = 4096
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 BUCKETS = ("current", "1-30", "31-60", "61-90", "over 90")
+DEFAULT_WINDOW_DAYS = 7
+HISTORY_KEY_PREFIX = "ai-collections-followup-demo history key v1"
+HISTORY_FIELDS = ("customer_key", "exported_on", "total", "request_sha256")
 
 PLAIN_AMOUNT = re.compile(r"[0-9]+(?:\.[0-9]+)?")   # 4200 or 4200.50; not 4,200, -5 or 1e3
 WHOLE_NUMBER = re.compile(r"[0-9]+")                 # 45; not 45.0
 NUMBER = re.compile(r"\d+(?:,\d{3})*(?:\.\d+)?")     # a figure in a text: 950, 12,800 or 12800.50
+ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")  # 2026-11-24
+SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 # Text shaped like a stand-in, such as "Customer 003" or "ID 777". Whether it is one is decided by this run's key,
 # never by the shape: a shaped token that is not in the key is an unknown stand-in.
 STAND_IN_SHAPE = re.compile(
@@ -181,22 +194,119 @@ def personal_values(rows):
     return values
 
 
-def prepare(sheet, prompt_path):
-    """Everything before the model call: check the sheet, replace the personal columns, build the request, guard it.
-    Nothing is sent here."""
+def iso_date(text):
+    """A date written yyyy-mm-dd, for the command line."""
+    if not ISO_DATE.fullmatch(text or ""):
+        raise argparse.ArgumentTypeError(f"{text!r} is not a date written yyyy-mm-dd")
+    try:
+        return datetime.date.fromisoformat(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a date in the calendar")
+
+
+def positive_whole(text):
+    """A whole number of 1 or more, for the command line."""
+    if not WHOLE_NUMBER.fullmatch(text or "") or int(text) < 1:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number of 1 or more")
+    return int(text)
+
+
+def customer_key(name, id_numbers):
+    """The run history's key for a customer: a sha256 over a fixed prefix, the name (spaces collapsed, letter case
+    ignored) and the identity numbers (spaces and hyphens removed). The history file holds no name, but the key is
+    not anonymous: anyone who has the sheet can compute it again."""
+    ids = sorted({re.sub(r"[\s-]", "", i) for i in id_numbers} - {""})
+    text = "\n".join([HISTORY_KEY_PREFIX, " ".join(name.split()).casefold(), ",".join(ids)])
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def customer_keys(rows, clean):
+    """stand-in -> the customer's history key, from the real name and identity numbers of the sheet."""
+    names, ids = {}, {}
+    for row, out in zip(rows, clean):
+        names[out[NAME]] = row[NAME]
+        ids.setdefault(out[NAME], set()).add(row.get(ID_NUMBER) or "")
+    return {who: customer_key(names[who], ids[who]) for who in names}
+
+
+def history_problem(record, as_of):
+    """Why a parsed history line cannot be used, or None."""
+    if not isinstance(record, dict) or sorted(record) != sorted(HISTORY_FIELDS):
+        return "it is not a history record (exactly " + ", ".join(HISTORY_FIELDS) + ")"
+    if not all(isinstance(record[f], str) for f in HISTORY_FIELDS):
+        return "every field must be a text"
+    for field in ("customer_key", "request_sha256"):
+        if not SHA256_HEX.fullmatch(record[field]):
+            return f"{field} is not a sha256 in hex"
+    if not PLAIN_AMOUNT.fullmatch(record["total"]):
+        return f"total {record['total']!r} is not a plain decimal number"
+    try:
+        exported = iso_date(record["exported_on"])
+    except argparse.ArgumentTypeError as exc:
+        return f"exported_on {exc}"
+    if exported > as_of:
+        return f"exported_on {record['exported_on']} is after the run's date {as_of.isoformat()}"
+    return None
+
+
+def read_history(path, as_of):
+    """The run history: one JSON object per line, written by approval.py export. A missing file is an empty history
+    (the first export creates it). Any line that is not a complete record, an empty line included, or that is dated
+    after the run's date, refuses the run (exit 2) with its line number: nothing is guessed."""
+    path = pathlib.Path(path)
+    if not path.exists():
+        return []
+    records = []
+    for number, line in enumerate(read_file(path, "the history file").splitlines(), start=1):
+        try:
+            problem = history_problem(json.loads(line), as_of)
+        except ValueError:
+            problem = "it is not JSON"
+        if problem:
+            raise PipelineError(f"the history file, line {number}: {problem}", 2)
+        record = json.loads(line)
+        records.append(dict(record, date=datetime.date.fromisoformat(record["exported_on"])))
+    return records
+
+
+def earlier_drafts(history, keys, expected, as_of, window_days):
+    """Which owing customers were exported inside the window: the latest such line of each customer counts (a later
+    line of the same date wins). Returns two dicts, stand-in -> that line: the customers whose total is the same,
+    who are left out of the request, and those whose total changed, who are drafted again and marked."""
+    latest = {}
+    for record in history:
+        if (as_of - record["date"]).days < window_days:
+            seen = latest.get(record["customer_key"])
+            if seen is None or record["date"] >= seen["date"]:
+                latest[record["customer_key"]] = record
+    drafted, changed = {}, {}
+    for who, c in expected.items():
+        record = latest.get(keys[who])
+        if c["total"] > 0 and record is not None:
+            (drafted if Decimal(record["total"]) == c["total"] else changed)[who] = record
+    return drafted, changed
+
+
+def prepare(sheet, prompt_path, history=(), as_of=None, window_days=DEFAULT_WINDOW_DAYS):
+    """Everything before the model call: check the sheet, replace the personal columns, leave out the customers the
+    history shows as already drafted, build the request, guard it. Nothing is sent here."""
     rows, columns = load_sheet(sheet)
     clean, key = pseudonymise.pseudonymise(rows, columns)
     for row, out in zip(rows, clean):
         # The two figure columns were checked as plain numbers. They go to the model as written, so the scrub of
         # nine-digit numbers can never change an amount.
         out[AMOUNT], out[DAYS] = row[AMOUNT].strip(), row[DAYS].strip()
-    request_text = build_request(read_file(prompt_path, "the prompt"), clean)
+    everyone = expected_by_customer(clean, key)
+    keys = customer_keys(rows, clean)
+    drafted, changed = earlier_drafts(history, keys, everyone, as_of or datetime.date.today(), window_days)
+    request_text = build_request(read_file(prompt_path, "the prompt"), [r for r in clean if r[NAME] not in drafted])
     lowered = request_text.lower()
     leaked = sorted(v for v in personal_values(rows) if v.lower() in lowered)
     if leaked:
         raise PipelineError(f"{len(leaked)} personal value(s) would reach the model; nothing was sent", 2)
     return {"clean": clean, "key": key, "request": request_text, "leaked": leaked,
-            "expected": expected_by_customer(clean, key)}
+            "expected": {who: c for who, c in everyone.items() if who not in drafted}, "everyone": everyone,
+            "customer_keys": keys, "already_drafted": drafted, "amount_changed": changed}
 
 
 class RecordedBackend:
@@ -344,10 +454,12 @@ def note_problem(note, sheet_figures, key):
     return None
 
 
-def item_problem(item, expected, seen, priorities, key):
+def item_problem(item, expected, seen, priorities, key, left_out=frozenset()):
     """Why a call-list item cannot be accepted, or None when every check passes."""
     who = item.get("customer")
     amount, days, priority = item.get("amount"), item.get("days_late"), item.get("priority")
+    if isinstance(who, str) and who in left_out:
+        return "this customer was already drafted and was left out of the request"
     if not isinstance(who, str) or who not in expected:
         return "this customer is not in the sheet"
     c = expected[who]
@@ -370,16 +482,16 @@ def item_problem(item, expected, seen, priorities, key):
     return reminder_problem(item.get("reminder"), who, c, key) or reason_problem(item.get("reason"), c, key)
 
 
-def validate(answer, expected, key):
+def validate(answer, expected, key, left_out=frozenset()):
     """Split the call list into accepted and rejected items, each rejection with its reason, and list who is missing.
-    Split the notes for a person into accepted and rejected the same way.
-    Returns (accepted, rejected, missing, notes, rejected_notes)."""
+    Split the notes for a person into accepted and rejected the same way. left_out holds the stand-ins that the run
+    history left out of the request. Returns (accepted, rejected, missing, notes, rejected_notes)."""
     accepted, rejected, seen, priorities = [], [], set(), set()
     for item in answer["call_list"]:
         if not isinstance(item, dict):
             rejected.append({"item": str(item)[:80], "reason": "not an object"})
             continue
-        problem = item_problem(item, expected, seen, priorities, key)
+        problem = item_problem(item, expected, seen, priorities, key, left_out)
         if problem:
             rejected.append({"customer": str(item.get("customer", ""))[:80], "reason": problem})
             continue
@@ -403,8 +515,9 @@ def validate(answer, expected, key):
     return accepted, rejected, missing, notes, rejected_notes
 
 
-def page_for_a_person(rejected, missing, notes, rejected_notes, key):
-    """The page a person reads after the run, with the real names restored. It stays on this computer."""
+def page_for_a_person(rejected, missing, notes, rejected_notes, key, history=None):
+    """The page a person reads after the run, with the real names restored. It stays on this computer. With a run
+    history, history = (already_drafted, amount_changed, window_days, the sheet's customers) adds two sections."""
     def section(title, entries):
         return [title] + ([f"- {e}" for e in entries] or ["- none"]) + [""]
 
@@ -414,6 +527,14 @@ def page_for_a_person(rejected, missing, notes, rejected_notes, key):
                      [f"{r.get('customer', r.get('item'))}: {r['reason']}" for r in rejected])
     lines += section("Customers who owe money and are missing from the answer:", missing)
     lines += section("Notes rejected by the checks:", [f"{r['note']} ({r['reason']})" for r in rejected_notes])
+    if history is not None:
+        drafted, changed, window_days, everyone = history
+        lines += section(f"Already drafted in the last {window_days} days, with the same total (left out of the "
+                         "request):", [f"{who}: drafted on {r['exported_on']}, total {r['total']}"
+                                       for who, r in sorted(drafted.items())])
+        lines += section("Drafted again: the amount changed since the last draft:",
+                         [f"{who}: {money(everyone[who]['total'])} now, {r['total']} when drafted on "
+                          f"{r['exported_on']}" for who, r in sorted(changed.items())])
     return pseudonymise.restore("\n".join(lines), key)
 
 
@@ -472,30 +593,64 @@ def write_json(path, data):
     return write_text(path, json.dumps(data, ensure_ascii=False, indent=1) + "\n")
 
 
-def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook=False):
+def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook=False, history=None, as_of=None,
+        window_days=DEFAULT_WINDOW_DAYS):
+    """One run. history is the run history file, or None for no history (every owing customer is asked about);
+    as_of is the run's date, today when None."""
     out_dir = pathlib.Path(out_dir)
     if out_dir.exists():
         raise PipelineError(f"refusing to write into an existing folder: {out_dir}", 2)
     if webhook:
         check_webhook(webhook, allow_remote_webhook)
-    prep = prepare(sheet, prompt_path)
+    as_of = as_of or datetime.date.today()
+    records = read_history(history, as_of) if history is not None else []
+    prep = prepare(sheet, prompt_path, records, as_of, window_days)
     key = prep["key"]
-    answer = parse_answer(backend.complete(prep["request"]))
-    accepted, rejected, missing, notes, rejected_notes = validate(answer, prep["expected"], key)
+    drafted, changed = prep["already_drafted"], prep["amount_changed"]
+    # When the history shows every owing customer as already drafted, there is nothing to ask the model.
+    model_called = not drafted or any(c["total"] > 0 for c in prep["expected"].values())
+    answer = parse_answer(backend.complete(prep["request"])) if model_called else {"call_list": [], "for_a_human": []}
+    accepted, rejected, missing, notes, rejected_notes = validate(answer, prep["expected"], key, frozenset(drafted))
+
+    def real(text):
+        return pseudonymise.restore(text, key)
 
     out_dir.mkdir(parents=True)
     with (out_dir / "call-list.csv").open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["priority", "customer", "amount", "days_late", "bucket", "reason"])
         for a in accepted:
-            w.writerow([a["priority"], pseudonymise.restore(a["customer"], key), money(a["amount"]), a["days_late"],
-                        bucket_of(prep["expected"][a["customer"]]), pseudonymise.restore(a["reason"], key)])
-    rem = out_dir / "reminders"
-    rem.mkdir()
+            w.writerow([a["priority"], real(a["customer"]), money(a["amount"]), a["days_late"],
+                        bucket_of(prep["expected"][a["customer"]]), real(a["reason"])])
+    # The drafts, each with the sha256 of its bytes as written: approval.py refuses to export a changed draft.
+    drafts_sha256 = {"call-list.csv": hashlib.sha256((out_dir / "call-list.csv").read_bytes()).hexdigest()}
+    drafts = []
+    (out_dir / "reminders").mkdir()
     for a in accepted:
-        write_text(rem / f"reminder-{a['priority']:02d}.txt", pseudonymise.restore(a["reminder"], key) + "\n")
-    write_text(out_dir / "for-a-person.txt", page_for_a_person(rejected, missing, notes, rejected_notes, key) + "\n")
-    owing = {who: c for who, c in prep["expected"].items() if c["total"] > 0}
+        name = f"reminders/reminder-{a['priority']:02d}.txt"
+        drafts_sha256[name] = write_text(out_dir / name, real(a["reminder"]) + "\n")
+        drafts.append({"item": a["priority"], "customer": a["customer"], "amount": money(a["amount"]),
+                       "days_late": a["days_late"], "bucket": bucket_of(prep["expected"][a["customer"]]),
+                       "file": name, "customer_key": prep["customer_keys"][a["customer"]],
+                       "amount_changed": a["customer"] in changed})
+    page_history = (drafted, changed, window_days, prep["everyone"]) if history is not None else None
+    write_text(out_dir / "for-a-person.txt",
+               page_for_a_person(rejected, missing, notes, rejected_notes, key, page_history) + "\n")
+    # The same content, with the real names, in a form report.py can read without parsing the page.
+    write_json(out_dir / "for-a-person.json", {
+        "note": "For a person to read. It holds real names: keep it on this computer.",
+        "for_a_human": [real(n) for n in notes],
+        "rejected": [{"customer": real(str(r.get("customer", r.get("item")))), "reason": real(r["reason"])}
+                     for r in rejected],
+        "missing_from_answer": [real(who) for who in missing],
+        "rejected_notes": [{"note": real(r["note"]), "reason": real(r["reason"])} for r in rejected_notes],
+        "already_drafted": [{"customer": real(who), "drafted_on": r["exported_on"], "total": r["total"]}
+                            for who, r in sorted(drafted.items())],
+        "amount_changed": [{"customer": real(who), "total": money(prep["everyone"][who]["total"]),
+                            "last_total": r["total"], "last_drafted_on": r["exported_on"]}
+                           for who, r in sorted(changed.items())],
+    })
+    owing = {who: c for who, c in prep["everyone"].items() if c["total"] > 0}
     report = {
         "backend": backend.name,
         "model": backend.model,
@@ -508,8 +663,19 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
         "for_a_human": notes,
         "rejected_notes": rejected_notes,
         "sent_to_customers": 0,  # there is no send step
+        "as_of": as_of.isoformat(),
+        "model_called": model_called,
         "total_owed": money(sum((c["total"] for c in owing.values()), Decimal(0))),
-        "ageing": ageing(prep["expected"]),
+        "ageing": ageing(prep["everyone"]),
+        "history_lines": len(records) if history is not None else None,
+        "window_days": window_days,
+        "already_drafted": [{"customer": who, "drafted_on": r["exported_on"], "total": r["total"]}
+                            for who, r in sorted(drafted.items())],
+        "amount_changed": [{"customer": who, "total": money(prep["everyone"][who]["total"]),
+                            "last_total": r["total"], "last_drafted_on": r["exported_on"]}
+                           for who, r in sorted(changed.items())],
+        "drafts": drafts,
+        "drafts_sha256": drafts_sha256,
     }
     write_json(out_dir / "run-report.json", report)
     if webhook:
@@ -533,12 +699,19 @@ def main(argv=None):
     ap.add_argument("--webhook", help="an automation trigger URL on this computer (n8n or Make style)")
     ap.add_argument("--allow-remote-webhook", action="store_true")
     ap.add_argument("--print-request", action="store_true", help="print the exact text the model would get, then stop")
+    ap.add_argument("--history", help="the run history (JSON lines, written by approval.py export); without it, "
+                                      "every owing customer is asked about, as before")
+    ap.add_argument("--as-of", type=iso_date, help="the run's date, yyyy-mm-dd (default: today)")
+    ap.add_argument("--window-days", type=positive_whole, default=DEFAULT_WINDOW_DAYS,
+                    help="a customer exported this many days ago or less, with the same total, is not drafted again")
     args = ap.parse_args(argv)
     if not args.out and not args.print_request:
         ap.error("--out is required, except with --print-request")
     try:
         if args.print_request:
-            request_text = prepare(args.sheet, args.prompt)["request"]
+            as_of = args.as_of or datetime.date.today()
+            records = read_history(args.history, as_of) if args.history is not None else []
+            request_text = prepare(args.sheet, args.prompt, records, as_of, args.window_days)["request"]
             sys.stdout.flush()
             sys.stdout.buffer.write(request_text.encode("utf-8"))  # the exact bytes: UTF-8, LF line ends
             sys.stdout.buffer.flush()
@@ -547,7 +720,8 @@ def main(argv=None):
             backend = RecordedBackend(args.recorded)
         else:
             backend = AnthropicBackend(args.model, args.api_base)
-        report = run(args.sheet, args.prompt, backend, args.out, args.webhook, args.allow_remote_webhook)
+        report = run(args.sheet, args.prompt, backend, args.out, args.webhook, args.allow_remote_webhook,
+                     args.history, args.as_of, args.window_days)
     except PipelineError as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return exc.code
@@ -555,6 +729,11 @@ def main(argv=None):
     line = (f"backend {report['backend']} | owing {report['customers_owing']} | accepted {report['accepted']} | "
             f"rejected {len(report['rejected'])} | missing {len(report['missing_from_answer'])} | "
             f"rejected notes {len(report['rejected_notes'])} | sent to customers {report['sent_to_customers']}")
+    if report["history_lines"] is not None:
+        line += (f" | history lines {report['history_lines']} | already drafted {len(report['already_drafted'])}"
+                 f" | amount changed {len(report['amount_changed'])}")
+    if not report["model_called"]:
+        line += " | model not called: every owing customer was already drafted"
     if status is not None:
         line += f" | webhook {status}"
     print(line)
