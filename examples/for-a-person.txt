@@ -12,7 +12,6 @@ Notes from the model:
 - Willow Garden Supplies (invented) does not answer on 000-000-0008; try willow-garden-supplies@example.com instead.
 - Riverbend Bicycle Repairs (invented) does not answer on 000-000-0019; try riverbend-bicycle-repairs@example.com instead.
 - Meadow Print Shop (invented) does not answer on 000-000-0020; try meadow-print-shop@example.com instead.
-- Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept.
 
 Items rejected by the checks (not in the call list):
 - none
@@ -21,5 +20,5 @@ Customers who owe money and are missing from the answer:
 - none
 
 Notes rejected by the checks:
-- none
+- Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept. (the note holds a loose reference to a stand-in: 005, 007, 016)
 

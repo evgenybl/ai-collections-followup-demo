@@ -4,7 +4,13 @@ Everything in this folder is written by `python -I make_examples.py`, and nothin
 
 It is the real output of `python -I demo.py --case happy-path --as-of 2026-11-24 --at 2026-11-24T09:00:00Z` on the shipped sheet (`make_sheet.py`, seed 7, 25 customers) with `recorded-answer.json`: one real answer from `claude-haiku-5-5`, recorded on 2026-11-24 (a Claude Code subagent given the request text as its whole prompt; the answer saved as returned).
 
-What the checks did with it: 22 of 22 owing customers accepted, 0 item(s) rejected, 0 missing, and 0 note(s) for a person set aside.
+What the checks did with it: 22 of 22 owing customers accepted, 0 item(s) rejected, 0 missing, and 1 note(s) for a person set aside.
+
+The note(s) set aside, as the run report keeps them (with stand-ins), and the reason:
+
+- "Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept." (the note holds a loose reference to a stand-in: 005, 007, 016)
+
+A note may state only figures that are in the sheet, and a stand-in counts only when it is written in full, such as `Customer 019`. Written any other way, its number reads as a figure the check cannot confirm, and the note goes to a person as set aside instead of passing as checked. The check is strict on purpose: it would rather show a person a note it cannot confirm, even one that is right in substance, as the sheet's own notes on the phone show this one to be.
 
 The demo printed:
 

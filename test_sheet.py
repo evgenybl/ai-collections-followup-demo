@@ -160,9 +160,14 @@ class RecordedAnswerTest(TempTest):
     def test_the_shipped_recorded_answer_runs_through_the_guard(self):
         out = self.base / "rec"
         report = pipeline.run(SHEET, PROMPT, pipeline.RecordedBackend(RECORDED), out)
-        # What the checks do with the recording: every owing customer accepted, every figure right.
+        # What the checks do with the recording: every owing customer accepted, every figure right, and one note for a
+        # person set aside, because it refers to three customers by bare numbers instead of their stand-ins.
         self.assertEqual((report["customers_owing"], report["accepted"]), (22, 22))
-        self.assertEqual((report["rejected"], report["missing_from_answer"], report["rejected_notes"]), ([], [], []))
+        self.assertEqual((report["rejected"], report["missing_from_answer"]), ([], []))
+        self.assertEqual(report["rejected_notes"], [{
+            "note": "Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is "
+                    "kept.",
+            "reason": "the note holds a loose reference to a stand-in: 005, 007, 016"}])
         first = (out / "call-list.csv").read_text(encoding="utf-8-sig").splitlines()[1]
         self.assertTrue(first.startswith("1,Cobalt Bakery (invented),12295,123,over 90,"), first)
 

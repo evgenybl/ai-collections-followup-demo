@@ -20,10 +20,14 @@
   "Customer 025 asked to split the payment into two instalments; a person must decide the instalment plan.",
   "Customer 008 does not answer on Phone 008; try Email 008 instead.",
   "Customer 019 does not answer on Phone 019; try Email 019 instead.",
-  "Customer 020 does not answer on Phone 020; try Email 020 instead.",
-  "Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept."
+  "Customer 020 does not answer on Phone 020; try Email 020 instead."
  ],
- "rejected_notes": [],
+ "rejected_notes": [
+  {
+   "note": "Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept.",
+   "reason": "the note holds a loose reference to a stand-in: 005, 007, 016"
+  }
+ ],
  "sent_to_customers": 0,
  "as_of": "2026-11-24",
  "model_called": true,

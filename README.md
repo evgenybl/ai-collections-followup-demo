@@ -64,7 +64,7 @@ A run of the pipeline drafts; nothing leaves its folder until a person decides. 
 
 ```
 $ python -I pipeline.py --out out-run
-backend recorded | owing 22 | accepted 22 | rejected 0 | missing 0 | rejected notes 0 | sent to customers 0
+backend recorded | owing 22 | accepted 22 | rejected 0 | missing 0 | rejected notes 1 | sent to customers 0
 $ python -I approval.py list out-run
 item 1 | Cobalt Bakery (invented) | 12295 | over 90 | pending
 $ python -I approval.py approve out-run --item 1 --by "Your Name"

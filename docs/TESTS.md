@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-116 tests in 6 files.
+121 tests in 7 files.
 
 ## test_approval.py
 
@@ -24,6 +24,20 @@ Tests of the approval step: decisions recorded, appended and refused, and the ex
 - export writes only the approved drafts and the history
 - the next run leaves out what was exported
 - without at the time is now in utc
+
+## test_checks.py
+
+Tests of the checks added after an independent review: loose references to stand-ins, what a reminder may not hold, the sheet check's limits, the leak guard's whole words, and the amounts kept exact after the scrub.
+
+### TextCheckTest
+
+Every checked text: the note for a person, the reason and the reminder.
+
+- a leading zero inside a decimal a thousands group or a stand in is not loose
+- a loose reference is refused in a reason and in a reminder
+- a loose reference to stand ins is set aside in a note
+- a numeral other than 0 to 9 is refused everywhere
+- a reminder may not hold a per cent sign or a web address
 
 ## test_demo.py
 

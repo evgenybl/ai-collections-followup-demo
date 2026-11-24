@@ -65,6 +65,8 @@ PLAIN_AMOUNT = re.compile(r"[0-9]+(?:\.[0-9]+)?")   # 4200 or 4200.50; not 4,200
 WHOLE_NUMBER = re.compile(r"[0-9]+")                 # 45; not 45.0
 NUMBER = re.compile(r"\d+(?:,\d{3})*(?:\.\d+)?")     # a figure in a text: 950, 12,800 or 12800.50
 ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")  # 2026-11-24
+LOOSE_STAND_IN = re.compile(r"(?<![\w.,])0[0-9]+")  # 005 or 016 on its own; not 0.05, 1,050 or Customer 005
+WEB_ADDRESS = re.compile(r"(?i)\bhttps?://\S*|\bwww\.\S*|\b(?:[a-z0-9-]+\.)+(?:com|net|org|info|io|co|uk|il)\b\S*")
 SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 # Text shaped like a stand-in, such as "Customer 003" or "ID 777". Whether it is one is decided by this run's key,
 # never by the shape: a shaped token that is not in the key is an unknown stand-in.
@@ -154,12 +156,31 @@ def stand_ins_in(text, key):
     return found & key.keys(), found - key.keys()
 
 
+def without_tokens(text, stand_ins):
+    """The text with the given stand-ins (exact tokens) taken out."""
+    for token in stand_ins:
+        text = re.sub(r"(?<!\w)" + re.escape(token) + r"(?!\w)", " ", text)
+    return text
+
+
 def numbers_in(text, stand_ins):
     """The figures a text states in digits, after the given stand-ins (exact tokens, whose numbering is not a figure)
     are taken out. Any other digits count, so an unknown stand-in cannot hide a figure."""
-    for token in stand_ins:
-        text = re.sub(r"(?<!\w)" + re.escape(token) + r"(?!\w)", " ", text)
-    return {Decimal(n.replace(",", "")) for n in NUMBER.findall(text)}
+    return {Decimal(n.replace(",", "")) for n in NUMBER.findall(without_tokens(text, stand_ins))}
+
+
+def loose_problem(text, stand_ins, what):
+    """What every checked text must not hold: a numeral other than the digits 0 to 9 (a circled or a full-width
+    digit, which the figure check would not read as written), and a number with a leading zero outside an exact
+    stand-in, such as 005 in "Customers 005 and 007": a loose reference to a stand-in, which could pass the figure
+    check only by chance."""
+    odd = sorted({ch for ch in text if ch.isnumeric() and ch not in "0123456789"})
+    if odd:
+        return f"the {what} holds a numeral other than 0 to 9: " + " ".join(f"U+{ord(ch):04X}" for ch in odd)
+    loose = LOOSE_STAND_IN.findall(without_tokens(text, stand_ins))
+    if loose:
+        return f"the {what} holds a loose reference to a stand-in: " + ", ".join(loose)
+    return None
 
 
 def expected_by_customer(clean_rows, key):
@@ -417,6 +438,14 @@ def reminder_problem(reminder, who, c, key):
         return "the reminder holds an unknown stand-in: " + listed(unknown)
     if known - {who}:
         return "the reminder names a stand-in other than this customer: " + listed(known - {who})
+    problem = loose_problem(reminder, {who}, "reminder")
+    if problem:
+        return problem
+    if "%" in reminder:
+        return "the reminder holds a per cent sign"
+    web = WEB_ADDRESS.search(reminder)
+    if web:
+        return f"the reminder holds a web address: {web.group(0).rstrip('.,;:!?)')}"
     figures = numbers_in(reminder, {who})
     extra = figures - {c["total"], Decimal(c["days"])}
     if extra:
@@ -435,6 +464,9 @@ def reason_problem(reason, c, key):
         return "the reason holds an unknown stand-in: " + listed(unknown)
     if known - c["stand_ins"]:
         return "the reason names a stand-in from outside this customer's rows: " + listed(known - c["stand_ins"])
+    problem = loose_problem(reason, known, "reason")
+    if problem:
+        return problem
     extra = numbers_in(reason, known) - c["figures"]
     if extra:
         return "the reason states a figure that is not one of this customer's: " + listed(extra, money)
@@ -448,6 +480,9 @@ def note_problem(note, sheet_figures, key):
     known, unknown = stand_ins_in(note, key)
     if unknown:
         return "the note holds an unknown stand-in: " + listed(unknown)
+    problem = loose_problem(note, known, "note")
+    if problem:
+        return problem
     extra = numbers_in(note, known) - sheet_figures
     if extra:
         return "the note states a figure that is not in the sheet: " + listed(extra, money)
