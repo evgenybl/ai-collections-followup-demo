@@ -54,6 +54,15 @@ ID_NUMBER = "id_number"
 MODEL_COLUMNS = [NAME, AMOUNT, DAYS, NOTES]
 KNOWN_COLUMNS = MODEL_COLUMNS + [c for c in pseudonymise.PERSONAL if c not in MODEL_COLUMNS]
 MAX_WHOLE_DIGITS = 15  # an amount's digits before the point; a longer one is refused, so that no total is rounded
+# The sheets this repository ships, by sha256. A run on one of them is labelled synthetic data; any other sheet, an
+# edited copy included, is a sheet supplied by the user. A test checks these against the files.
+SHIPPED_SHEETS = {
+    "customers.synthetic.csv": "d830d47ce1b1b1135af79e754164f7d831d8468f49ff729c5ee3b69462b523c3",
+    "fixtures/customers.six-rows.csv": "a2b58e1a7ff11d06cad8c4d96ee392cc9d3f2eec128e5e4e9441c2c00c02a85f",
+    "gallery/bad-sheet.csv": "c685886ee74079c11b13e8ea4563e0eb182975ea551d4a52dc557d994ae0625f",
+    "gallery/leak-sheet.csv": "eab2a031525fb08a35e0bcbe22af8adc4843c466fa7cf3a8e357ba31ce0f8b31",
+}
+SHIPPED_META = HERE / "recorded-answer.meta.json"  # the recording the label "Recorded" is earned against
 API_KEY_ENV = "ANTHROPIC_API_KEY"
 DEFAULT_MODEL = "claude-haiku-5-5"
 DEFAULT_API_BASE = "https://api.anthropic.com"
@@ -655,6 +664,16 @@ def api_host(api_base):
     return host + (f":{parts.port}" if parts.port else "")
 
 
+def shipped_recording():
+    """The answer_sha256 and request_sha256 of the shipped recording's meta file; None for what cannot be read."""
+    try:
+        meta = json.loads(SHIPPED_META.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        meta = {}
+    meta = meta if isinstance(meta, dict) else {}
+    return meta.get("answer_sha256"), meta.get("request_sha256")
+
+
 def write_text(path, text):
     """Write UTF-8 with LF line ends on every system, so that a file's sha256 does not depend on the system that
     wrote it, and return that sha256."""
@@ -738,13 +757,23 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
     })
     owing = {who: c for who, c in prep["everyone"].items() if c["total"] > 0}
     api_base = getattr(backend, "api_base", None)
+    request_sha256 = hashlib.sha256(prep["request"].encode("utf-8")).hexdigest()
+    sheet_sha256 = hashlib.sha256(pathlib.Path(sheet).read_bytes()).hexdigest()
+    answer_sha256 = getattr(backend, "sha256", None)
+    shipped_answer, shipped_request = shipped_recording()
     report = {
         "backend": backend.name,
         "model": backend.model,
+        # The facts the report page's labels are earned from: what was replayed, and on which sheet.
+        "answer_sha256": answer_sha256,
+        "answer_is_shipped_recording": answer_sha256 is not None and answer_sha256 == shipped_answer,
+        "request_is_shipped_recordings": request_sha256 == shipped_request,
+        "sheet_sha256": sheet_sha256,
+        "sheet_is_shipped": sheet_sha256 in SHIPPED_SHEETS.values(),
         # Where the API requests went, so that a run against a mock or another endpoint is never shown as live.
         "api_host": api_host(api_base) if api_base else None,
         "api_default_address": api_base == DEFAULT_API_BASE if api_base else None,
-        "request_sha256": hashlib.sha256(prep["request"].encode("utf-8")).hexdigest(),
+        "request_sha256": request_sha256,
         "personal_values_in_request": len(prep["leaked"]),
         "customers_owing": len(owing),
         "accepted": len(accepted),

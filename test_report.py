@@ -12,6 +12,7 @@ from decimal import Decimal
 from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
+# HERE is also where the shipped sheet, the gallery and the fixtures are.
 sys.path.insert(0, str(HERE))
 import approval  # noqa: E402
 import pipeline  # noqa: E402
@@ -47,7 +48,8 @@ class ReportTest(TempTest):
         places = [text.index(f'id="{part}"') for part in PARTS]
         self.assertEqual(places, sorted(places))
         header = text[places[0]:places[1]]
-        for words in ("Synthetic data", "Recorded", f"As of {AS_OF}", "This page holds real names"):
+        for words in ("Synthetic data", "Replayed file, origin not verified", f"As of {AS_OF}",
+                      "This page holds real names (in this demo every name is invented)"):
             self.assertIn(words, header)
         footer = text[places[-1]:]
         self.assertEqual(footer.count("<p"), 4)  # three lines on what was checked and what was not, then the last
@@ -132,6 +134,45 @@ class ReportTest(TempTest):
         self.assertIn(f"{name[changed]}<span class=\"changed\">amount changed since the last draft</span>", text)
         self.assertIn(f"<li>{name[changed]}: ", text)
 
+    def test_the_labels_are_earned_from_the_files(self):
+        def tags(run, name):
+            text = self.page(run, name + ".html")
+            return re.search(r'<p class="meta"><span class="tag">([^<]*)</span><span class="tag">([^<]*)</span>',
+                             text).groups(), text
+
+        def pipeline_run(name, *argv):
+            code, _, err = call_main(pipeline, ["--out", str(self.base / name), "--as-of", AS_OF, *argv])
+            self.assertEqual(code, 0, err)
+            return self.base / name
+
+        # The shipped sheet and the shipped recording: both earned.
+        self.assertEqual(tags(pipeline_run("shipped"), "shipped")[0], ("Synthetic data", "Recorded"))
+        # The gallery's constructed answers are replayed files whose origin is not verified.
+        for answer in ("wrong-total.json", "invented-customer.json"):
+            run = pipeline_run(answer, "--recorded", str(HERE / "gallery" / answer))
+            self.assertEqual(tags(run, answer)[0], ("Synthetic data", "Replayed file, origin not verified"))
+        # The first version's real recording is not the shipped one, so its origin is not verified here either.
+        run = pipeline_run("six", "--sheet", str(HERE / "fixtures" / "customers.six-rows.csv"),
+                           "--prompt", str(HERE / "fixtures" / "prompt.six-rows.txt"),
+                           "--recorded", str(HERE / "fixtures" / "recorded-answer.six-rows.json"))
+        self.assertEqual(tags(run, "six")[0], ("Synthetic data", "Replayed file, origin not verified"))
+        # A sheet is known by its sha256, not by its name: an exact copy is the shipped sheet, an edited copy is not.
+        copy, edited = self.base / "copy.csv", self.base / "edited.csv"
+        copy.write_bytes(SHEET.read_bytes())
+        edited.write_bytes(SHEET.read_bytes().replace(b"Paid in full", b"Paid in full.", 1))
+        self.assertEqual(tags(pipeline_run("copy", "--sheet", str(copy)), "copy")[0], ("Synthetic data", "Recorded"))
+        (sheet_tag, _), text = tags(pipeline_run("edited", "--sheet", str(edited)), "edited")
+        self.assertEqual(sheet_tag, "Sheet supplied by the user")
+        self.assertIn("This page holds real names (from the sheet supplied by the user)", text)
+        # The shipped recording replayed for another request (the history left a customer out).
+        prep = pipeline.prepare(SHEET, PROMPT)
+        who = sorted(w for w, c in prep["expected"].items() if c["total"] > 0)[0]
+        history = self.write("one.jsonl", json.dumps({
+            "customer_key": prep["customer_keys"][who], "exported_on": AS_OF,
+            "total": pipeline.money(prep["everyone"][who]["total"]), "request_sha256": "ab" * 32}) + "\n")
+        run = pipeline_run("other", "--history", str(history))
+        self.assertEqual(tags(run, "other")[0], ("Synthetic data", "Recorded answer, replayed for another request"))
+
     def test_an_answer_for_a_customer_already_drafted_is_listed_apart(self):
         prep = pipeline.prepare(SHEET, PROMPT)
         who = sorted(w for w, c in prep["expected"].items() if c["total"] > 0)[0]
@@ -177,18 +218,18 @@ class ReportTest(TempTest):
         data = json.loads((self.base / "default" / "run-report.json").read_text(encoding="utf-8"))
         self.assertEqual((data["api_host"], data["api_default_address"]), ("api.anthropic.com", True))
         self.assertIn('<span class="tag">Live</span>', self.page(self.base / "default", "default.html"))
-        # 3. The recorded answer.
+        # 3. A replayed answer file: no API at all.
         run = self.run_pipeline(constructed_answer(prep))
         data = json.loads((run / "run-report.json").read_text(encoding="utf-8"))
         self.assertEqual((data["api_host"], data["api_default_address"]), (None, None))
-        self.assertIn('<span class="tag">Recorded</span>', self.page(run))
+        self.assertIn('<span class="tag">Replayed file, origin not verified</span>', self.page(run))
         owing = [who for who, c in prep["expected"].items() if c["total"] > 0]
         history = self.write("all.jsonl", "".join(json.dumps({
             "customer_key": prep["customer_keys"][who], "exported_on": AS_OF,
             "total": pipeline.money(prep["everyone"][who]["total"]), "request_sha256": "ab" * 32}) + "\n"
             for who in owing))
         text = self.page(self.run_pipeline({"call_list": []}, "none", "--history", str(history)), "none.html")
-        self.assertIn("Recorded: the model was not called, every owing customer was already drafted", text)
+        self.assertIn('<span class="tag">No model answer: every owing customer was already drafted</span>', text)
         self.assertIn("<p>No drafts in this run.</p>", text)
 
     def test_a_folder_that_is_not_a_run_or_decisions_from_another_run_are_refused(self):

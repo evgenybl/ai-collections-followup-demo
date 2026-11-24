@@ -89,15 +89,28 @@ def shown(text):
 
 
 def backend_label(report):
-    """What answered, from the run report's facts: Recorded for a recorded answer; Live only for the Anthropic backend
-    at its default address; for any other address, "Live path, custom endpoint" and the host it went to."""
+    """What answered, read from the run report's facts. Recorded only when the replayed file and the request are the
+    shipped recording's (its meta file's sha256s); the shipped recording replayed for another request says so; any
+    other replayed file's origin is not verified. Live only for the Anthropic backend at its default address; for any
+    other address, "Live path, custom endpoint" and the host it went to."""
+    if not report["model_called"]:
+        return "No model answer: every owing customer was already drafted"
     if report["backend"] == "recorded":
-        return "Recorded"
+        if report.get("answer_is_shipped_recording") and report.get("request_is_shipped_recordings"):
+            return "Recorded"
+        if report.get("answer_is_shipped_recording"):
+            return "Recorded answer, replayed for another request"
+        return "Replayed file, origin not verified"
     if report["backend"] == "anthropic":
         if report.get("api_default_address"):
             return "Live"
         return f"Live path, custom endpoint {report.get('api_host') or 'not recorded'}"
     return report["backend"]
+
+
+def sheet_label(report):
+    """Synthetic data only when the sheet is one this repository ships (its sha256); otherwise the user's sheet."""
+    return "Synthetic data" if report.get("sheet_is_shipped") else "Sheet supplied by the user"
 
 
 def state_html(entry):
@@ -136,20 +149,20 @@ def load(folder):
 def page(report, states, person, rows, reminders):
     drafts = sorted(report["drafts"], key=lambda d: d["item"])
     total_owed = Decimal(report["total_owed"])
-    label = backend_label(report)
-    if not report["model_called"]:
-        label += ": the model was not called, every owing customer was already drafted"
+    names = ("in this demo every name is invented" if report.get("sheet_is_shipped")
+             else "from the sheet supplied by the user")
     out = ["<!doctype html>", '<html lang="en">', "<head>", '<meta charset="utf-8">',
            '<meta name="viewport" content="width=device-width, initial-scale=1">',
            f"<title>Collections run as of {esc(report['as_of'])}</title>", f"<style>{STYLE}</style>", "</head>",
            "<body>", "<main>"]
 
     out += ['<header id="header">',
-            f'<p class="meta"><span class="tag">Synthetic data</span><span class="tag">{esc(label)}</span>'
+            f'<p class="meta"><span class="tag">{esc(sheet_label(report))}</span>'
+            f'<span class="tag">{esc(backend_label(report))}</span>'
             f'<span class="tag">As of {esc(report["as_of"])}</span></p>',
             "<h1>Collections follow-up: drafts for a person to decide</h1>",
-            '<p class="warning">This page holds real names (in this demo every name is invented). Keep it on this '
-            "computer, as you would keep for-a-person.txt.</p>", "</header>"]
+            f'<p class="warning">This page holds real names ({names}). Keep it on this computer, as you would keep '
+            "for-a-person.txt.</p>", "</header>"]
 
     figures = [("Customers owing", report["customers_owing"]), ("Total owed", shown(report["total_owed"])),
                ("Drafts waiting for a decision", sum(1 for d in drafts if states[d["item"]] is None)),

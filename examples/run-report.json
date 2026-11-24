@@ -1,6 +1,11 @@
 {
  "backend": "recorded",
  "model": "recorded:recorded-answer.json",
+ "answer_sha256": "253d62887849e1c3905fa8ab6384b7216ca09e603786956c622c8deae4b35757",
+ "answer_is_shipped_recording": true,
+ "request_is_shipped_recordings": true,
+ "sheet_sha256": "d830d47ce1b1b1135af79e754164f7d831d8468f49ff729c5ee3b69462b523c3",
+ "sheet_is_shipped": true,
  "api_host": null,
  "api_default_address": null,
  "request_sha256": "8cd58a359ac00681edeacdb8e2334d1fa57d8ce0fd530d41ea17e7cedc4728aa",

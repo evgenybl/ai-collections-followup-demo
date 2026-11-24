@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-131 tests in 7 files.
+133 tests in 7 files.
 
 ## test_approval.py
 
@@ -197,6 +197,7 @@ Tests of the report page: its parts and their order, its figures from the run's 
 - refusals the history and a changed amount are shown
 - text from the model or the sheet is shown as text
 - the label says live only for the default api address
+- the labels are earned from the files
 - the page has its nine parts in order
 - the page is self contained
 - the page shows the decisions when it is written again
@@ -227,3 +228,4 @@ Tests of the generated sheet (make_sheet.py), the ageing buckets, and the shippe
 - the shipped request carries no personal value
 - the shipped sheet has what the specification asks
 - the shipped sheet is the generators output for the committed seed
+- the shipped sheets hashes are the files

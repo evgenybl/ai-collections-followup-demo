@@ -84,6 +84,10 @@ class SheetGeneratorTest(TempTest):
             self.assertTrue(row["id_number"].startswith("0000000") and row["phone"].startswith("000-000-"))
         self.assertTrue(any(r["id_number"] in r["notes"] for r in rows), "an identity note repeats a personal value")
 
+    def test_the_shipped_sheets_hashes_are_the_files(self):
+        for name, digest in pipeline.SHIPPED_SHEETS.items():
+            self.assertEqual(hashlib.sha256((HERE / name).read_bytes()).hexdigest(), digest, name)
+
     def test_the_shipped_request_carries_no_personal_value(self):
         rows, _ = pipeline.load_sheet(SHEET)
         request = pipeline.prepare(SHEET, PROMPT)["request"].lower()
