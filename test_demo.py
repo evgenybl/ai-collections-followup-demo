@@ -164,12 +164,23 @@ class ExamplesTest(unittest.TestCase):
             data = (EXAMPLES / name).read_bytes()
             self.assertEqual(hashlib.sha256(data).hexdigest(), run_report["drafts_sha256"][name], name)
 
+    def test_the_demo_picture_is_drawn_from_a_real_run(self):
+        picture = (HERE / "docs" / "img" / "demo.svg").read_bytes()
+        self.assertEqual(picture, make_examples.demo_picture(),
+                         "docs/img/demo.svg is out of date: run python -I make_examples.py")
+        text = picture.decode("utf-8")
+        self.assertIn(f">$ {make_examples.PICTURE_COMMAND}</text>", text)
+        for name in CASE_NAMES:
+            self.assertIn(f">{name} ", text)
+        self.assertIn(">10 of 10 case(s) ended as expected | written under out-demo/demo-001</text>", text)
+        self.assertNotIn("<script", text)
+
     def test_the_list_of_tests_is_up_to_date(self):
         self.assertEqual((HERE / "docs" / "TESTS.md").read_text(encoding="utf-8"), run_tests.markdown(),
                          "docs/TESTS.md is out of date: run python -I make_examples.py")
 
     def test_the_examples_hold_no_path_of_this_computer(self):
-        for path in list(EXAMPLES.rglob("*")) + list(GALLERY.rglob("*")):
+        for path in list(EXAMPLES.rglob("*")) + list(GALLERY.rglob("*")) + [HERE / "docs" / "img" / "demo.svg"]:
             if path.is_file():
                 text = path.read_bytes().decode("utf-8")
                 for marker in (str(HERE), HERE.as_posix(), "C:\\", "/home/", "/tmp/", "\\Users\\"):

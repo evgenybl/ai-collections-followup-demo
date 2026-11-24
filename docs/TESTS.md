@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-113 tests in 6 files.
+114 tests in 6 files.
 
 ## test_approval.py
 
@@ -41,6 +41,7 @@ Tests of the failure gallery (demo.py and gallery/), the examples and the list o
 
 ### ExamplesTest
 
+- the demo picture is drawn from a real run
 - the example export holds only what was approved
 - the examples are what make examples writes
 - the examples hold no path of this computer

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="872" height="294" viewBox="0 0 872 294" role="img" aria-label="Terminal output: python -I demo.py --out out-demo">
+<rect width="872" height="294" rx="8" fill="#0d1117"/>
+<rect width="872" height="34" rx="8" fill="#161b22"/>
+<rect y="26" width="872" height="8" fill="#161b22"/>
+<circle cx="18" cy="17" r="5.5" fill="#f85149"/><circle cx="36" cy="17" r="5.5" fill="#d29922"/><circle cx="54" cy="17" r="5.5" fill="#3fb950"/>
+<text x="436" y="22" fill="#8b949e" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12.5" text-anchor="middle">python -I demo.py --out out-demo</text>
+<g fill="#e6edf3" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">
+<text x="16" y="63" fill="#79c0ff">$ python -I demo.py --out out-demo</text>
+<text x="16" y="82" fill="#7ee787">happy-path         exit 0, approved 2, held 1 back with a reason, exported 2        PASS</text>
+<text x="16" y="101" fill="#7ee787">bad-sheet          exit 2, 4,200 caught by the sheet check, nothing written         PASS</text>
+<text x="16" y="120" fill="#7ee787">wrong-total        exit 0, the wrong total set aside, 21 others kept                PASS</text>
+<text x="16" y="139" fill="#7ee787">invented-customer  exit 0, Customer 026 set aside, 22 others kept                   PASS</text>
+<text x="16" y="158" fill="#7ee787">leak-guard         exit 2, a personal value caught before sending, nothing written  PASS</text>
+<text x="16" y="177" fill="#7ee787">second-run         exit 0, 22 of 22 already drafted, model not called               PASS</text>
+<text x="16" y="196" fill="#7ee787">no-approval        exit 0, no decision recorded, nothing exported                   PASS</text>
+<text x="16" y="215" fill="#7ee787">foreign-decisions  exit 2, another run&#x27;s decisions caught, nothing exported         PASS</text>
+<text x="16" y="234" fill="#7ee787">api-error          exit 3, the mock&#x27;s HTTP 500 caught, nothing written              PASS</text>
+<text x="16" y="253" fill="#7ee787">webhook-down       exit 4, webhook unreachable, outputs kept                        PASS</text>
+<text x="16" y="272">10 of 10 case(s) ended as expected | written under out-demo/demo-001</text>
+</g></svg>

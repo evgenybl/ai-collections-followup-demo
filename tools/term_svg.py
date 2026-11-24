@@ -1,13 +1,14 @@
 """Draw a command's real output as an SVG picture of a terminal window, with no browser.
 
-Gate G9 of the decision page: every image comes from a real run. This tool takes a text file that a run printed (or runs
-a command itself with --run) and draws exactly those lines. It adds nothing and removes nothing except trailing spaces;
-lines longer than --width are cut and end in an ellipsis, and the picture's caption line says how many lines were cut.
+Every picture in this repository comes from a real run. This tool takes a text file that a run printed (or runs a
+command itself with --run) and draws exactly those lines. It adds nothing and removes nothing except trailing spaces;
+lines longer than --width are cut and end in an ellipsis, and the line it prints says how many lines were cut.
+make_examples.py calls draw() to write docs/img/demo.svg.
 
 Standard library only. It writes one file.
 
-    python -I term_svg.py --in <output.txt> --out <picture.svg> --title "python -I demo.py --out demo-run"
-    python -I term_svg.py --run "python -I demo.py --list" --out <picture.svg>
+    python -I tools/term_svg.py --in <output.txt> --out <picture.svg> --title "python -I demo.py --out out-demo"
+    python -I tools/term_svg.py --run "python -I demo.py --list" --out <picture.svg>
 """
 import argparse
 import html

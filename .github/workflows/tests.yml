@@ -31,10 +31,10 @@ jobs:
         run: python -I run_tests.py
       - name: Run the whole demo
         run: python -I demo.py --out out-demo
-      - name: Write the examples, the gallery and the test list again, and compare
+      - name: Write the examples, the gallery, the demo picture and the test list again, and compare
         run: |
           python -I make_examples.py
-          git diff --exit-code -- examples gallery docs/TESTS.md
+          git diff --exit-code -- examples gallery docs
           test -z "$(git status --porcelain -- examples gallery docs)"
       - name: Run the pipeline on the recorded answer
         run: python -I pipeline.py --out out-run

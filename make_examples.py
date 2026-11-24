@@ -3,11 +3,12 @@
 - gallery/: the constructed wrong answers and broken sheets of the failure gallery, each the recorded answer or the
   shipped sheet with one thing changed (gallery/README.md, written by hand, says what);
 - examples/: the real output of demo.py --case happy-path for the committed seed, a fixed --as-of and a fixed --at;
+- docs/img/demo.svg: the closing table of a real run of the whole demo, drawn by tools/term_svg.py;
 - docs/TESTS.md: the list of the tests, from their names.
 
 CI runs this and fails if git then shows any difference. Nothing in examples/ is edited by hand.
 Standard library only. Run: python -I make_examples.py
-Exit codes: 0 written; 1 the demo case did not end as expected (examples/ is left as it was).
+Exit codes: 0 written; 1 a demo run did not end as expected (examples/ and the picture are left as they were).
 """
 import argparse
 import contextlib
@@ -16,17 +17,20 @@ import csv
 import io
 import json
 import pathlib
+import subprocess
 import sys
 import tempfile
 from decimal import Decimal
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(1, str(HERE / "tools"))
 import demo  # noqa: E402
 import make_sheet  # noqa: E402
 import pipeline  # noqa: E402
 import pseudonymise  # noqa: E402
 import run_tests  # noqa: E402
+import term_svg  # noqa: E402
 
 AS_OF = "2026-11-24"
 AT = "2026-11-24T09:00:00Z"
@@ -34,6 +38,8 @@ REMINDERS_SHOWN = 3
 EXAMPLES = HERE / "examples"
 GALLERY = HERE / "gallery"
 DOCS_TESTS = HERE / "docs" / "TESTS.md"
+PICTURE = HERE / "docs" / "img" / "demo.svg"
+PICTURE_COMMAND = "python -I demo.py --out out-demo"
 
 
 def json_ready(value):
@@ -164,6 +170,24 @@ def example_files():
         return files
 
 
+def demo_picture():
+    """docs/img/demo.svg as bytes: the closing table and the total line of a real run of the whole demo, drawn by
+    tools/term_svg.py under the command that printed them. The demo runs as its own process in an empty folder, exactly
+    as PICTURE_COMMAND says; None when it did not end as expected."""
+    with tempfile.TemporaryDirectory() as tmp:
+        done = subprocess.run([sys.executable, "-I", str(HERE / "demo.py"), "--out", "out-demo"], cwd=tmp,
+                              capture_output=True, text=True, encoding="utf-8")
+    if done.returncode != 0:
+        print(done.stdout + done.stderr, end="", file=sys.stderr)
+        return None
+    lines = done.stdout.splitlines()
+    closing = lines[lines.index("") + 1:]  # after the detailed lines and the blank line that ends them
+    svg, cut = term_svg.draw(["$ " + PICTURE_COMMAND] + closing, PICTURE_COMMAND, demo.COMPACT_WIDTH)
+    if cut:
+        raise ValueError(f"{cut} line(s) of the closing table are wider than {demo.COMPACT_WIDTH} characters")
+    return svg.encode("utf-8")
+
+
 def sync(folder, files):
     """Make the folder hold exactly these files (path -> bytes): write each, then remove any other file and any
     folder left empty. Only paths inside the folder are touched."""
@@ -185,13 +209,17 @@ def main(argv=None):
     for name, data in gallery.items():
         (GALLERY / name).write_bytes(data)
     examples = example_files()
-    if examples is None:
-        print("REFUSED: the happy-path case did not end as expected; examples/ was left as it was", file=sys.stderr)
+    picture = demo_picture()
+    if examples is None or picture is None:
+        print("REFUSED: a demo run did not end as expected; examples/ and the picture were left as they were",
+              file=sys.stderr)
         return 1
     sync(EXAMPLES, examples)
+    PICTURE.parent.mkdir(parents=True, exist_ok=True)
+    PICTURE.write_bytes(picture)
     DOCS_TESTS.parent.mkdir(exist_ok=True)
     pipeline.write_text(DOCS_TESTS, run_tests.markdown())
-    print(f"gallery: {len(gallery)} files | examples: {len(examples)} files | docs/TESTS.md: "
+    print(f"gallery: {len(gallery)} files | examples: {len(examples)} files | docs/img/demo.svg | docs/TESTS.md: "
           f"{len(list(run_tests.cases(run_tests.suite())))} tests")
     return 0
 
