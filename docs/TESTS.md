@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-121 tests in 7 files.
+125 tests in 7 files.
 
 ## test_approval.py
 
@@ -28,6 +28,13 @@ Tests of the approval step: decisions recorded, appended and refused, and the ex
 ## test_checks.py
 
 Tests of the checks added after an independent review: loose references to stand-ins, what a reminder may not hold, the sheet check's limits, the leak guard's whole words, and the amounts kept exact after the scrub.
+
+### SheetCheckTest
+
+- a header that differs only in letter case is refused with the expected name
+- an amount with more than 15 digits before the point is refused
+- the amounts are restored after the scrub
+- the leak guard matches whole words as the scrubber does
 
 ### TextCheckTest
 

@@ -51,6 +51,8 @@ import pseudonymise  # noqa: E402
 NAME, AMOUNT, DAYS, NOTES = "name", "amount_due", "days_late", "notes"
 ID_NUMBER = "id_number"
 MODEL_COLUMNS = [NAME, AMOUNT, DAYS, NOTES]
+KNOWN_COLUMNS = MODEL_COLUMNS + [c for c in pseudonymise.PERSONAL if c not in MODEL_COLUMNS]
+MAX_WHOLE_DIGITS = 15  # an amount's digits before the point; a longer one is refused, so that no total is rounded
 API_KEY_ENV = "ANTHROPIC_API_KEY"
 DEFAULT_MODEL = "claude-haiku-5-5"
 DEFAULT_API_BASE = "https://api.anthropic.com"
@@ -123,13 +125,24 @@ def load_sheet(path):
         raise PipelineError(f"cannot read the sheet: {exc}", 2)
     for col in MODEL_COLUMNS:
         if col not in columns:
-            raise PipelineError(f"the sheet has no column {col!r} (column names must match exactly)", 2)
+            like = [c for c in columns if c.casefold() == col.casefold()]
+            has = f"it has {like[0]!r}; " if like else ""
+            raise PipelineError(f"the sheet has no column {col!r} ({has}column names must match exactly)", 2)
+    for col in columns:
+        for known in KNOWN_COLUMNS:
+            if col != known and col.casefold() == known.casefold():
+                raise PipelineError(f"the sheet has a column {col!r} where {known!r} is expected (column names must "
+                                    "match exactly)", 2)
     for number, row in enumerate(rows, start=2):  # row 1 is the header
         where = f"row {number} of the sheet"
         if not (row.get(NAME) or "").strip():
             raise PipelineError(f"{where}: the name is empty", 2)
-        if not PLAIN_AMOUNT.fullmatch((row.get(AMOUNT) or "").strip()):
+        amount = (row.get(AMOUNT) or "").strip()
+        if not PLAIN_AMOUNT.fullmatch(amount):
             raise PipelineError(f"{where}: {AMOUNT} {row.get(AMOUNT)!r} is not a plain decimal number of 0 or more", 2)
+        if len(amount.split(".")[0]) > MAX_WHOLE_DIGITS:
+            raise PipelineError(f"{where}: {AMOUNT} {amount!r} has more than {MAX_WHOLE_DIGITS} digits before the "
+                                "point", 2)
         if not WHOLE_NUMBER.fullmatch((row.get(DAYS) or "").strip()):
             raise PipelineError(f"{where}: {DAYS} {row.get(DAYS)!r} is not a whole number of 0 or more", 2)
     return rows, columns
@@ -321,8 +334,8 @@ def prepare(sheet, prompt_path, history=(), as_of=None, window_days=DEFAULT_WIND
     keys = customer_keys(rows, clean)
     drafted, changed = earlier_drafts(history, keys, everyone, as_of or datetime.date.today(), window_days)
     request_text = build_request(read_file(prompt_path, "the prompt"), [r for r in clean if r[NAME] not in drafted])
-    lowered = request_text.lower()
-    leaked = sorted(v for v in personal_values(rows) if v.lower() in lowered)
+    # As whole words in any letter case, as the scrub matches them: a short name is not found inside a longer word.
+    leaked = sorted(v for v in personal_values(rows) if pseudonymise.whole_word(v).search(request_text))
     if leaked:
         raise PipelineError(f"{len(leaked)} personal value(s) would reach the model; nothing was sent", 2)
     return {"clean": clean, "key": key, "request": request_text, "leaked": leaked,

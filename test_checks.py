@@ -80,5 +80,45 @@ class TextCheckTest(unittest.TestCase):
                          ["the note holds a numeral other than 0 to 9: U+2460"])
 
 
+class SheetCheckTest(TempTest):
+    def refused(self, text):
+        spy = SpyBackend("{}")
+        with self.assertRaises(pipeline.PipelineError) as ctx:
+            pipeline.run(self.write("sheet.csv", text), PROMPT, spy, self.base / "out")
+        self.assertEqual((ctx.exception.code, spy.calls), (2, 0))
+        self.assertFalse((self.base / "out").exists())
+        return str(ctx.exception)
+
+    def test_an_amount_with_more_than_15_digits_before_the_point_is_refused(self):
+        head = "name,amount_due,days_late,notes\n"
+        self.assertIn("row 2 of the sheet: amount_due '1234567890123456' has more than 15 digits before the point",
+                      self.refused(head + "Big Shop,1234567890123456,1,\n"))
+        prep = pipeline.prepare(self.write("ok.csv", head + "Big Shop,123456789012345.67,1,\n"), PROMPT)
+        self.assertEqual(prep["expected"]["Customer 001"]["total"], Decimal("123456789012345.67"))
+
+    def test_a_header_that_differs_only_in_letter_case_is_refused_with_the_expected_name(self):
+        self.assertIn("the sheet has no column 'name' (it has 'Name'; column names must match exactly)",
+                      self.refused("Name,amount_due,days_late,notes\nA B,5,1,\n"))
+        self.assertIn("the sheet has a column 'Phone' where 'phone' is expected (column names must match exactly)",
+                      self.refused("name,Phone,amount_due,days_late,notes\nA B,000-000-0001,5,1,\n"))
+
+    def test_the_leak_guard_matches_whole_words_as_the_scrubber_does(self):
+        head = "name,amount_due,days_late,notes\n"
+        # "Al" is inside "total" in the prompt, but it is not in the request as a word: not a leak.
+        request = pipeline.prepare(self.write("al.csv", head + "Al,5,1,\n"), PROMPT)["request"]
+        self.assertIn("total", request)
+        self.assertIn("\nCustomer 001,5,1,\n", request)
+        # A real leak is still caught: the name broken by a line break is joined in the request.
+        self.assertIn("1 personal value(s) would reach the model",
+                      self.refused(head + 'Alpha Shop,5,1,"Ask Alpha\nShop again"\n'))
+
+    def test_the_amounts_are_restored_after_the_scrub(self):
+        # A nine-digit amount looks like an identity number to the scrub of the notes' patterns.
+        sheet = self.write("sheet.csv", "name,amount_due,days_late,notes\nBig Shop,123456789,1,\n")
+        prep = pipeline.prepare(sheet, PROMPT)
+        self.assertIn("\nCustomer 001,123456789,1,\n", prep["request"])
+        self.assertEqual(prep["expected"]["Customer 001"]["total"], Decimal("123456789"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
