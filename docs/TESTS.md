@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-140 tests in 7 files.
+142 tests in 7 files.
 
 ## test_approval.py
 
@@ -26,7 +26,9 @@ Tests of the approval step: decisions recorded, appended and refused, and the ex
 - export refuses a second export and a decision after one
 - export refuses decisions that name another run
 - export writes only the approved drafts and the history
+- show prints the draft being decided
 - the next run leaves out what was exported
+- the page for a person ends with a key of the customers
 - without at the time is now in utc
 
 ## test_checks.py

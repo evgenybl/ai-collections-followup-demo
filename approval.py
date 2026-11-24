@@ -4,6 +4,7 @@ A run folder written by pipeline.py holds drafts: the call list and one reminder
 goes anywhere until a person decides:
 
   python -I approval.py list    <run folder>
+  python -I approval.py show    <run folder> --item <priority>
   python -I approval.py approve <run folder> --item <priority> --by <name> [--at <timestamp>]
   python -I approval.py reject  <run folder> --item <priority> --by <name> --reason <text> [--at <timestamp>]
   python -I approval.py export  <run folder> [--history <file>] [--as-of <yyyy-mm-dd>]
@@ -345,11 +346,36 @@ def listing(folder):
     return lines
 
 
+def showing(folder, item):
+    """The draft being decided: its call-list line and state, the model's reason, and the reminder as written."""
+    folder = pathlib.Path(folder)
+    report = load_run(folder)
+    last = states(report, load_decisions(folder, report))
+    drafts = {d["item"]: d for d in report["drafts"]}
+    if item not in drafts:
+        raise PipelineError(f"this run has no draft with item {item} (its items: "
+                            f"{', '.join(str(i) for i in sorted(drafts)) or 'none'})", 2)
+    draft = drafts[item]
+    header, rows = call_list_rows(folder)
+    row = dict(zip(header, rows.get(item, [])))
+    lines = [f"item {item} | {row.get('customer', draft['customer'])} | {draft['amount']} | {draft['days_late']} days "
+             f"late | {draft['bucket']} | {state_text(last[item])}",
+             f"reason: {row.get('reason', '')}", f"reminder ({draft['file']}):"]
+    lines += (folder / draft["file"]).read_text(encoding="utf-8").rstrip("\n").splitlines()
+    changed = [name for name in changed_drafts(folder, report) if name in ("call-list.csv", draft["file"])]
+    if changed:
+        lines.append("changed after it was written, so it cannot be decided or exported: " + ", ".join(changed))
+    return lines
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="command", required=True)
     p = sub.add_parser("list", help="each draft with its state: pending, approved or rejected")
     p.add_argument("run", help="the run folder")
+    p = sub.add_parser("show", help="the draft being decided: its line of the call list, the reason and the reminder")
+    p.add_argument("run", help="the run folder")
+    p.add_argument("--item", type=int, required=True, help="the draft's priority in the call list")
     for name, what in (("approve", "record an approval"), ("reject", "record a rejection, with its reason")):
         p = sub.add_parser(name, help=what)
         p.add_argument("run", help="the run folder")
@@ -366,6 +392,8 @@ def main(argv=None):
     try:
         if args.command == "list":
             print("\n".join(listing(args.run)))
+        elif args.command == "show":
+            print("\n".join(showing(args.run, args.item)))
         elif args.command in ("approve", "reject"):
             decision = "approved" if args.command == "approve" else "rejected"
             entry = record(args.run, args.item, decision, args.by, getattr(args, "reason", None), args.at)

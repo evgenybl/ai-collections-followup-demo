@@ -592,10 +592,18 @@ def validate(answer, expected, key):
     return accepted, rejected, missing, notes, rejected_notes
 
 
+def customer_key_list(key):
+    """This run's customers as (stand-in, name), in the order of their stand-ins."""
+    label = pseudonymise.PERSONAL[NAME] + " "
+    return sorted(((s, v) for s, v in key.items() if s.startswith(label)), key=lambda p: int(p[0][len(label):]))
+
+
 def page_for_a_person(rejected, missing, notes, rejected_notes, key, history=None, guarded=0):
     """The page a person reads after the run, with the real names restored. It stays on this computer. With a run
-    history, history = (already_drafted, amount_changed, window_days, the sheet's customers) adds two sections.
-    guarded is how many cells of call-list.csv were written with a leading apostrophe (safe_cells)."""
+    history, history = (already_drafted, amount_changed, window_days, the sheet's customers, the customers answered
+    although already drafted) adds three sections. guarded is how many cells of call-list.csv were written with a
+    leading apostrophe (safe_cells). It ends with a key of this run's customers, so that a text that names a stand-in
+    (a note set aside, for instance) can be read."""
     def section(title, entries):
         return [title] + ([f"- {e}" for e in entries] or ["- none"]) + [""]
 
@@ -617,7 +625,10 @@ def page_for_a_person(rejected, missing, notes, rejected_notes, key, history=Non
                          "counted as refused):", answered)
     lines += [f"Cells of call-list.csv written with a leading apostrophe, so that a spreadsheet shows them as text and "
               f"does not run them as formulas: {guarded}"]
-    return pseudonymise.restore("\n".join(lines), key)
+    # Added after the names are restored, or the stand-ins of the key would be replaced too.
+    key_lines = ["", "Key of this run's customers (stand-in: name), to read a text that names a stand-in:"]
+    key_lines += [f"- {stand_in}: {name}" for stand_in, name in customer_key_list(key)]
+    return pseudonymise.restore("\n".join(lines), key) + "\n" + "\n".join(key_lines)
 
 
 def check_webhook(url, allow_remote):
@@ -773,6 +784,7 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
                             "last_total": r["total"], "last_drafted_on": r["exported_on"]}
                            for who, r in sorted(changed.items())],
         "answered_although_drafted": [real(who) for who in answered_drafted],
+        "customers": dict(customer_key_list(key)),
     })
     owing = {who: c for who, c in prep["everyone"].items() if c["total"] > 0}
     api_base = getattr(backend, "api_base", None)

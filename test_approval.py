@@ -68,6 +68,30 @@ class ApprovalTest(TempTest):
                                    f"{first['bucket']} | pending")
         self.assertFalse((self.run_dir / "decisions.json").exists(), "listing records nothing")
 
+    def test_show_prints_the_draft_being_decided(self):
+        first = self.report["drafts"][0]
+        reminder = (self.run_dir / first["file"]).read_text(encoding="utf-8").rstrip("\n")
+        code, printed, _ = call_main(approval, ["show", str(self.run_dir), "--item", "1"])
+        self.assertEqual(code, 0)
+        lines = printed.splitlines()
+        self.assertEqual(lines[0], f"item 1 | {self.prep['key'][first['customer']]} | {first['amount']} | "
+                                   f"{first['days_late']} days late | {first['bucket']} | pending")
+        self.assertTrue(lines[1].startswith("reason: A balance of "), lines[1])
+        self.assertEqual(lines[2:], ["reminder (reminders/reminder-01.txt):"] + reminder.splitlines())
+        self.decide("approve", 1)
+        self.assertIn(f"| approved by {BY} at {AT}", call_main(approval, ["show", str(self.run_dir), "--item", "1"])[1])
+        code, _, err = call_main(approval, ["show", str(self.run_dir), "--item", "999"])
+        self.assertEqual(code, 2)
+        self.assertIn("this run has no draft with item 999", err)
+
+    def test_the_page_for_a_person_ends_with_a_key_of_the_customers(self):
+        page = (self.run_dir / "for-a-person.txt").read_text(encoding="utf-8")
+        key = page.split("Key of this run's customers (stand-in: name), to read a text that names a stand-in:\n")[1]
+        customers = {s: n for s, n in self.prep["key"].items() if s.startswith("Customer ")}
+        self.assertEqual(key.splitlines(), [f"- {s}: {customers[s]}" for s in sorted(customers)])
+        person = json.loads((self.run_dir / "for-a-person.json").read_text(encoding="utf-8"))
+        self.assertEqual(person["customers"], customers)
+
     def test_approvals_and_rejections_are_recorded_with_who_when_and_why(self):
         self.assertEqual(self.decide("approve", 1)[0], 0)
         code, printed, _ = self.decide("reject", 2, "--reason", "  The owner calls this customer first  ")
