@@ -10,13 +10,13 @@ The first five lines of the call list the example run drafted, from [`examples/c
 
 ```
 priority,customer,amount,days_late,bucket,reason
-1,Quarry Laundry (invented),13585,98,over 90,"A balance of 13,585; the oldest open invoice is 98 days late."
-2,Cobalt Bakery (invented),12295,123,over 90,"A balance of 12,295; the oldest open invoice is 123 days late."
-3,Cobalt Florist (invented),2215.35,173,over 90,"A balance of 2,215.35; the oldest open invoice is 173 days late."
-4,Lantern Locksmiths (invented),14171.5,64,61-90,"A balance of 14,171.50; the oldest open invoice is 64 days late."
+1,Cobalt Florist (invented),2215.35,173,over 90,"Longest delay in the table at 173 days, with a smaller amount."
+2,Quarry Laundry (invented),13585,98,over 90,"98 days late, and it asked to split the payment into two instalments."
+3,Juniper Tile Works (invented),21655,47,31-60,"47 days late on a large debt, and it says the invoice never arrived, so resend it on the call."
+4,Bramble Framing (invented),13995,75,61-90,"75 days late; it promised to pay by the end of the month, so check that promise."
 ```
 
-At this commit the model answer behind it is a placeholder constructed from the sheet's own figures, not a model's answer: see [What is real here](#what-is-real-here).
+The order and the reasons are a real model's, from the recorded answer; every figure in them was checked against the sheet.
 
 ## Try it in two minutes
 
@@ -29,7 +29,7 @@ python -I demo.py --out out-demo
 runs the ten cases of the failure gallery and prints one line for each. The first:
 
 ```
-happy-path | expected: exit 0; the export holds only the approved drafts | happened: exit 0; 22 drafts; items 3 and 6 approved, item 1 rejected (a note names it), 19 pending; the export holds reminders reminder-03.txt, reminder-06.txt and call-list lines 3, 6; history lines 2; report written | PASS
+happy-path | expected: exit 0; the export holds only the approved drafts | happened: exit 0; 22 drafts; items 1 and 4 approved, item 2 rejected (a note names it), 19 pending; the export holds reminders reminder-01.txt, reminder-04.txt and call-list lines 1, 4; history lines 2; report written | PASS
 ```
 
 ```
@@ -84,7 +84,7 @@ flowchart LR
 
 | Path | Kind | What was actually run |
 |---|---|---|
-| The model answer the demo replays (`recorded-answer.json`) | Recorded | At this commit it is a **placeholder constructed from the sheet's own figures**, not a model's answer, and its meta file says so; it is to be replaced by a real model recording. One real answer from a Claude model, to the first version's six-row sheet, is kept in `fixtures/` with the sha256 of the request it answers. |
+| The model answer the demo replays (`recorded-answer.json`) | Recorded | One real answer from `claude-haiku-5-5` to the request built from the shipped sheet, recorded on 2026-11-24 by a Claude Code subagent given the request text as its whole prompt, and saved as returned. Tests check the sha256 of the request it answers and of the answer file itself. The checks accept all 22 owing customers and set aside one of its notes for a person (see the limits). The first version's real answer to its six-row sheet is kept in `fixtures/`. |
 | The live model path (`--backend anthropic`) | Mock | Tested against a local mock of the Messages API on 127.0.0.1, never against the real service |
 | The webhook (`--webhook`) | Mock | Tested against a local mock server; no real n8n or Make instance was called |
 | The pipeline, the checks, the run history, the approval, the report, the demo | Local | They run on the reader's computer: `python -I run_tests.py` and `python -I demo.py --out out-demo` |
@@ -109,7 +109,7 @@ The wrong answers and broken sheets in [`gallery/`](gallery/README.md) are const
 ## Limits, stated plainly
 
 - **Synthetic data.** Every customer is an invented business whose name ends in "(invented)", every e-mail address is at example.com, and the identity numbers and phone numbers are placeholders. No real person or business is in any file.
-- **At this commit there is no real model answer to the shipped sheet.** The recorded answer is a constructed placeholder until a real recording is made; a test ties any recording to the exact request by its sha256.
+- **The checks are strict, and they show false alarms.** The recorded answer has the note "Customers 008, 019 and 020 did not answer the phone; the table suggests email instead." In substance it is right: those three customers' notes say so. But only a stand-in written in full, such as `Customer 019`, counts, so the check reads "019" and "020" as figures that are not in the sheet and sets the note aside (the note states a figure that is not in the sheet: 19, 20). That is on purpose: a note the check cannot confirm goes to a person rather than passing as checked.
 - **One recorded model answer is not a measure of reliability.** Another run may order the list differently or make a mistake. The checks catch wrong figures and invented customers. They do not judge whether the order is wise; that stays with a person.
 - **The live API path was tested against a local mock, not against the real service.** The mock answers in the documented shape of the Messages API.
 - **Figures are checked only when they are written in digits.** A number written in words, such as "thirty days", is not checked.

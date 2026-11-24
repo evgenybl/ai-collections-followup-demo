@@ -56,9 +56,9 @@ Tests of the failure gallery (demo.py and gallery/), the examples and the list o
 
 The README quotes real output; these tests hold it to that.
 
+- every text about the recording names the note the checks set aside
 - the call list sample is the first five lines of the example
 - the quoted first lines are what the commands print
-- the readme says what the recorded answer is
 - the stated ci versions are the workflows
 - what is real has no live row and every case has its command
 
@@ -178,8 +178,8 @@ Tests of the generated sheet (make_sheet.py), the ageing buckets, and the shippe
 
 ### RecordedAnswerTest
 
-- a placeholder recording is exactly the constructed answer
 - the constructed answer passes every check
+- the shipped answer file is the recording byte for byte
 - the shipped recorded answer meta file matches the request
 - the shipped recorded answer runs through the guard
 

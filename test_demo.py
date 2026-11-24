@@ -203,12 +203,17 @@ class ReadmeTest(TempTest):
             self.assertIn(f"| `{name}` |", self.readme)
             self.assertIn(f"`python -I demo.py --case {name} --out out-demo`", self.readme)
 
-    def test_the_readme_says_what_the_recorded_answer_is(self):
-        meta = json.loads((HERE / "recorded-answer.meta.json").read_text(encoding="utf-8"))
-        if meta["route"] == "constructed placeholder, to be replaced by a real recording":
-            self.assertIn("**placeholder constructed from the sheet's own figures**", self.readme)
-        else:
-            self.assertNotIn("placeholder", self.readme, "the README still calls the recorded answer a placeholder")
+    def test_every_text_about_the_recording_names_the_note_the_checks_set_aside(self):
+        for stale in ("placeholder constructed", "constructed placeholder", "no real model answer", "at this commit"):
+            self.assertNotIn(stale, self.readme.lower())
+        prep = pipeline.prepare(SHEET, HERE / "prompt.txt")
+        *_, rejected_notes = pipeline.validate(pipeline.parse_answer(RECORDED.read_text(encoding="utf-8")),
+                                               prep["expected"], prep["key"])
+        self.assertEqual(len(rejected_notes), 1)
+        for path in (HERE / "README.md", HERE / "docs" / "DESIGN.md", EXAMPLES / "README.md", GALLERY / "README.md"):
+            text = " ".join(path.read_text(encoding="utf-8").split())  # line breaks in the text do not count
+            self.assertIn(f"\"{rejected_notes[0]['note']}\"", text, path.name)
+            self.assertIn(f"({rejected_notes[0]['reason']})", text, path.name)
 
 
 if __name__ == "__main__":

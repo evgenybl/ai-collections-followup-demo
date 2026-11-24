@@ -38,10 +38,17 @@ The four cases that read this folder are also one pipeline command each, for exa
 
 ## How a case is judged
 
+- The recorded answer is one real answer from a model. On the shipped sheet the checks accept all 22 owing customers
+  and reject nothing, and they set aside one of its notes for a person: "Customers 008, 019 and 020 did not answer the
+  phone; the table suggests email instead." (the note states a figure that is not in the sheet: 19, 20). In substance
+  the note is right: those three customers' notes say the phone was not answered. But only a stand-in written in full,
+  such as `Customer 019`, counts as one, so "019" and "020" read as figures the sheet does not have. The check is
+  strict on purpose and shows a person a note it cannot confirm; it is not softened to let this one through.
 - `wrong-total` and `invented-customer` are judged against what the recorded answer itself gives on the sheet: exactly
   one more rejection, of the right kind, and every other item kept as before.
-- `second-run` approves and exports every draft of the first run, then runs again inside the window. It expects the
-  recorded answer to draft every owing customer; if a recording leaves one out, that customer is asked about again and
-  the case says FAIL with what happened.
+- `second-run` approves and exports every draft of the first run, then runs again inside the window. The recorded
+  answer drafts all 22 owing customers, so the second run finds every one of them already drafted and does not call
+  the model. A recording that left a customer out would have that customer asked about again, and the case would say
+  FAIL with what happened.
 - `api-error` sets a placeholder key in the environment for the length of the case, because the live path needs one,
   and puts back whatever was there before. The mock never reads it.

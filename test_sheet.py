@@ -12,8 +12,11 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import make_sheet  # noqa: E402
 import pipeline  # noqa: E402
-from testsupport import (META, PLACEHOLDER_ROUTE, PROMPT, RECORDED, SHEET, TempTest, call_main,  # noqa: E402
-                         constructed_answer, constructed_answer_text)
+from testsupport import (META, PROMPT, RECORDED, SHEET, TempTest, call_main, constructed_answer,  # noqa: E402
+                         constructed_answer_text)
+
+# The sha256 of recorded-answer.json as the model returned it, so that an edited recording is caught.
+ANSWER_SHA256 = "2fe8b97837a27d42df9ff16dd62cbcd46dff1d11d1cecabbb781995606f69a5b"
 
 
 def customers(rows):
@@ -134,22 +137,33 @@ class AgeingTest(TempTest):
 class RecordedAnswerTest(TempTest):
     def test_the_shipped_recorded_answer_meta_file_matches_the_request(self):
         meta = json.loads(META.read_text(encoding="utf-8"))
-        self.assertEqual(sorted(meta), ["model", "recorded_on", "request_sha256", "route"])
+        self.assertEqual(sorted(meta), ["answer_sha256", "model", "recorded_on", "request_sha256", "route"])
         request = pipeline.prepare(SHEET, PROMPT)["request"]
         self.assertEqual(meta["request_sha256"], hashlib.sha256(request.encode("utf-8")).hexdigest(),
                          "the prompt or the sheet changed since the answer was recorded: record it again")
 
-    def test_the_shipped_recorded_answer_runs_through_the_guard(self):
-        report = pipeline.run(SHEET, PROMPT, pipeline.RecordedBackend(RECORDED), self.base / "rec")
-        self.assertEqual(report["accepted"], report["customers_owing"])
-        self.assertEqual((report["rejected"], report["missing_from_answer"], report["rejected_notes"]), ([], [], []))
-
-    def test_a_placeholder_recording_is_exactly_the_constructed_answer(self):
+    def test_the_shipped_answer_file_is_the_recording_byte_for_byte(self):
         meta = json.loads(META.read_text(encoding="utf-8"))
-        if meta["route"] != PLACEHOLDER_ROUTE:
-            self.skipTest("recorded-answer.json is a real recording, not the placeholder")
-        self.assertEqual(RECORDED.read_text(encoding="utf-8"), constructed_answer_text(pipeline.prepare(SHEET, PROMPT)))
-        self.assertIn("not a model's answer", meta["model"])
+        self.assertEqual(meta["answer_sha256"], ANSWER_SHA256)
+        self.assertEqual(hashlib.sha256(RECORDED.read_bytes()).hexdigest(), ANSWER_SHA256,
+                         "recorded-answer.json is not the answer as the model returned it")
+
+    def test_the_shipped_recorded_answer_runs_through_the_guard(self):
+        out = self.base / "rec"
+        report = pipeline.run(SHEET, PROMPT, pipeline.RecordedBackend(RECORDED), out)
+        # The real recording: every owing customer accepted, every figure right, and one note for a person set aside.
+        self.assertEqual((report["customers_owing"], report["accepted"]), (22, 22))
+        self.assertEqual((report["rejected"], report["missing_from_answer"]), ([], []))
+        self.assertEqual(report["rejected_notes"], [{
+            "note": "Customers 008, 019 and 020 did not answer the phone; the table suggests email instead.",
+            "reason": "the note states a figure that is not in the sheet: 19, 20"}])
+        # A false alarm in substance: the three are real customers whose notes say the phone was not answered. The
+        # check reads "019" and "020" as figures because only a stand-in written in full counts, and it stays strict.
+        notes = pipeline.prepare(SHEET, PROMPT)["clean"]
+        for who in ("Customer 008", "Customer 019", "Customer 020"):
+            self.assertTrue(any(r["name"] == who and r["notes"].startswith("No answer on") for r in notes), who)
+        first = (out / "call-list.csv").read_text(encoding="utf-8-sig").splitlines()[1]
+        self.assertTrue(first.startswith("1,Cobalt Florist (invented),2215.35,173,over 90,"), first)
 
     def test_the_constructed_answer_passes_every_check(self):
         prep = pipeline.prepare(SHEET, PROMPT)

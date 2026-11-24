@@ -97,8 +97,26 @@ def gallery_files():
     return {name: text.encode("utf-8") for name, text in files.items()}
 
 
+def what_the_checks_did(report):
+    """Lines that say what the checks did with the recorded answer, from the run report."""
+    lines = [f"What the checks did with it: {report['accepted']} of {report['customers_owing']} owing customers "
+             f"accepted, {len(report['rejected'])} item(s) rejected, {len(report['missing_from_answer'])} missing, "
+             f"and {len(report['rejected_notes'])} note(s) for a person set aside."]
+    if report["rejected_notes"]:
+        lines += ["", "The note(s) set aside, as the run report keeps them (with stand-ins), and the reason:", ""]
+        lines += [f"- \"{r['note']}\" ({r['reason']})" for r in report["rejected_notes"]]
+        lines += ["", "A note may state only figures that are in the sheet, and a stand-in counts only when it is "
+                      "written in full, such as `Customer 019`. Written any other way, its number reads as a figure "
+                      "the check cannot confirm, and the note goes to a person as set aside instead of passing as "
+                      "checked. The check is strict on purpose: it would rather show a person a note it cannot "
+                      "confirm, even one that is right in substance, as the sheet's own notes on the phone show this "
+                      "one to be."]
+    return lines
+
+
 def examples_readme(run, reminders, demo_line):
     meta = json.loads((HERE / "recorded-answer.meta.json").read_text(encoding="utf-8"))
+    report = json.loads((run / "run-report.json").read_text(encoding="utf-8"))
     decisions = json.loads((run / "decisions.json").read_text(encoding="utf-8"))["decisions"]
     decided = {kind: [str(e["item"]) for e in decisions if e["decision"] == kind] for kind in ("approved", "rejected")}
     return "\n".join([
@@ -107,7 +125,8 @@ def examples_readme(run, reminders, demo_line):
         "CI writes it again and fails if git then shows a difference.", "",
         f"It is the real output of `python -I demo.py --case happy-path --as-of {AS_OF} --at {AT}` on the shipped "
         f"sheet (`make_sheet.py`, seed {make_sheet.DEFAULT_SEED}, {make_sheet.DEFAULT_CUSTOMERS} customers) with "
-        f"`recorded-answer.json`. Its meta file says where that answer came from: \"{meta['route']}\".", "",
+        f"`recorded-answer.json`: one real answer from `{meta['model']}`, recorded on {meta['recorded_on']} "
+        f"({meta['route']}).", ""] + what_the_checks_did(report) + ["",
         "The demo printed:", "", "```", demo_line, "```", "",
         "| File | What it is |", "|---|---|",
         "| `call-list.csv` | The call list the run drafted, in priority order, with the (invented) names and each "

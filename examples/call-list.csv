@@ -1,23 +1,23 @@
 ﻿priority,customer,amount,days_late,bucket,reason
-1,Quarry Laundry (invented),13585,98,over 90,"A balance of 13,585; the oldest open invoice is 98 days late."
-2,Cobalt Bakery (invented),12295,123,over 90,"A balance of 12,295; the oldest open invoice is 123 days late."
-3,Cobalt Florist (invented),2215.35,173,over 90,"A balance of 2,215.35; the oldest open invoice is 173 days late."
-4,Lantern Locksmiths (invented),14171.5,64,61-90,"A balance of 14,171.50; the oldest open invoice is 64 days late."
-5,Bramble Framing (invented),13995,75,61-90,"A balance of 13,995; the oldest open invoice is 75 days late."
-6,Kestrel Bicycle Repairs (invented),7670,81,61-90,"A balance of 7,670; the oldest open invoice is 81 days late."
-7,Juniper Tile Works (invented),21655,47,31-60,"A balance of 21,655; the oldest open invoice is 47 days late."
-8,Pebble Pottery (invented),12910,50,31-60,"A balance of 12,910; the oldest open invoice is 50 days late."
-9,Harbour Glass Studio (invented),7770,51,31-60,"A balance of 7,770; the oldest open invoice is 51 days late."
-10,Linden Florist (invented),7401.6,36,31-60,"A balance of 7,401.60; the oldest open invoice is 36 days late."
-11,Sorrel Bookbinding (invented),6685.95,55,31-60,"A balance of 6,685.95; the oldest open invoice is 55 days late."
-12,Willow Garden Supplies (invented),2965,45,31-60,"A balance of 2,965; the oldest open invoice is 45 days late."
-13,Granite Upholstery (invented),25741.55,5,1-30,"A balance of 25,741.55; the oldest open invoice is 5 days late."
-14,Meadow Print Shop (invented),22545.35,22,1-30,"A balance of 22,545.35; the oldest open invoice is 22 days late."
-15,Maple Locksmiths (invented),20520,16,1-30,"A balance of 20,520; the oldest open invoice is 16 days late."
-16,Riverbend Bicycle Repairs (invented),17025.9,18,1-30,"A balance of 17,025.90; the oldest open invoice is 18 days late."
-17,Thistle Catering (invented),15760,9,1-30,"A balance of 15,760; the oldest open invoice is 9 days late."
-18,Granite Print Shop (invented),14240.35,8,1-30,"A balance of 14,240.35; the oldest open invoice is 8 days late."
-19,Orchard Print Shop (invented),4795,27,1-30,"A balance of 4,795; the oldest open invoice is 27 days late."
-20,Kestrel Florist (invented),34256.4,0,current,"A balance of 34,256.40 that is not late yet."
-21,Maple Bakery (invented),12345,0,current,"A balance of 12,345 that is not late yet."
-22,Orchard Bicycle Repairs (invented),330.95,0,current,A balance of 330.95 that is not late yet.
+1,Cobalt Florist (invented),2215.35,173,over 90,"Longest delay in the table at 173 days, with a smaller amount."
+2,Quarry Laundry (invented),13585,98,over 90,"98 days late, and it asked to split the payment into two instalments."
+3,Juniper Tile Works (invented),21655,47,31-60,"47 days late on a large debt, and it says the invoice never arrived, so resend it on the call."
+4,Bramble Framing (invented),13995,75,61-90,"75 days late; it promised to pay by the end of the month, so check that promise."
+5,Lantern Locksmiths (invented),14171.5,64,61-90,64 days late on a large debt; it promised to pay by the end of the month.
+6,Meadow Print Shop (invented),22545.35,22,1-30,"Large debt, 22 days late; it did not answer the phone, so try email."
+7,Pebble Pottery (invented),12910,50,31-60,"50 days late, with no notes."
+8,Maple Locksmiths (invented),20520,16,1-30,16 days late on a large debt; identity was already verified.
+9,Granite Upholstery (invented),25741.55,5,1-30,At most 5 days late; it asked to split the payment into two instalments.
+10,Kestrel Bicycle Repairs (invented),7670,81,61-90,81 days late; identity was already verified.
+11,Riverbend Bicycle Repairs (invented),17025.9,18,1-30,"18 days late; it did not answer the phone, so try email."
+12,Harbour Glass Studio (invented),7770,51,31-60,51 days late; identity was already verified.
+13,Thistle Catering (invented),15760,9,1-30,"9 days late, with no notes."
+14,Sorrel Bookbinding (invented),6685.95,55,31-60,"55 days late; it says the invoice never arrived, so resend it on the call."
+15,Granite Print Shop (invented),14240.35,8,1-30,8 days late; it promised to pay by the end of the month.
+16,Linden Florist (invented),7401.6,36,31-60,36 days late; it asked to split the payment into two instalments.
+17,Maple Bakery (invented),12345,0,current,"Not yet late, with no notes."
+18,Orchard Print Shop (invented),4795,27,1-30,"27 days late, with no notes."
+19,Willow Garden Supplies (invented),2965,45,31-60,"45 days late; it did not answer the phone, so try email."
+20,Cobalt Bakery (invented),12295,123,over 90,"123 days late, but it disputes the invoice, so resolve the dispute before pressing for payment."
+21,Kestrel Florist (invented),34256.4,0,current,"No days late, but it disputes the invoice, so the dispute comes first."
+22,Orchard Bicycle Repairs (invented),330.95,0,current,"No days late, but it says the invoice never arrived, so resend it."
