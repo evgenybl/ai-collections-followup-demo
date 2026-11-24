@@ -221,7 +221,11 @@ class ReadmeTest(TempTest):
         self.assertIn("\n".join(table), screen)
         self.assertIn("[`examples/report.html`](examples/report.html)", screen)
         self.assertIn("a page to open in a browser after cloning the repository", screen)
-        self.assertNotIn("![", screen)  # no picture on the first screen until one exists from a real render
+        # The one picture on the first screen is the capture of the example report, and its caption says how it was made.
+        self.assertEqual(screen.count("!["), 1)
+        self.assertIn("](docs/img/report.png)", screen)
+        self.assertIn("A capture of `examples/report.html`", screen)
+        self.assertTrue((HERE / "docs" / "img" / "report.png").is_file())
 
     def test_every_image_a_markdown_file_embeds_exists(self):
         files = [p for p in HERE.rglob("*.md")
