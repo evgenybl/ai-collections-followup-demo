@@ -132,6 +132,16 @@ class ReportTest(TempTest):
         self.assertIn(f"{name[changed]}<span class=\"changed\">amount changed since the last draft</span>", text)
         self.assertIn(f"<li>{name[changed]}: ", text)
 
+    def test_an_answer_for_a_customer_already_drafted_is_listed_apart(self):
+        prep = pipeline.prepare(SHEET, PROMPT)
+        who = sorted(w for w, c in prep["expected"].items() if c["total"] > 0)[0]
+        history = self.write("one.jsonl", json.dumps({
+            "customer_key": prep["customer_keys"][who], "exported_on": AS_OF,
+            "total": pipeline.money(prep["everyone"][who]["total"]), "request_sha256": "ab" * 32}) + "\n")
+        text = self.page(self.run_pipeline(constructed_answer(prep), "run", "--history", str(history)))
+        self.assertEqual(self.figure(text, "Items the checks refused"), "0")
+        self.assertIn("set aside, not counted as refused):</p>\n<ul><li>" + prep["key"][who] + "</li></ul>", text)
+
     def test_the_label_says_live_only_for_the_default_api_address(self):
         prep = pipeline.prepare(SHEET, PROMPT)
         answer = json.dumps(constructed_answer(prep))

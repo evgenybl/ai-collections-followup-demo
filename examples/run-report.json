@@ -90,6 +90,8 @@
  "window_days": 7,
  "already_drafted": [],
  "amount_changed": [],
+ "answered_although_drafted": [],
+ "answer_meta_request_sha256": "8cd58a359ac00681edeacdb8e2334d1fa57d8ce0fd530d41ea17e7cedc4728aa",
  "drafts": [
   {
    "item": 1,

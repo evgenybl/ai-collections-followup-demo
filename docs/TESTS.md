@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-129 tests in 7 files.
+131 tests in 7 files.
 
 ## test_approval.py
 
@@ -104,8 +104,9 @@ Tests of the run history: what an earlier export leaves out of the next request,
 - a changed total is drafted again and marked
 - a corrupt history line refuses the run with its line number
 - a customer exported inside the window with the same total is left out
-- a customer left out but returned by the model is rejected
 - a missing history file is an empty history
+- a replayed answer saved for another request is named in one line
+- an answer for a customer left out is listed apart and not counted as refused
 - bad dates and windows are refused by the command line
 - print request leaves the drafted customer out
 - the history key is a hash and holds no name
@@ -191,6 +192,7 @@ Tests of the report page: its parts and their order, its figures from the run's 
 
 - a folder that is not a run or decisions from another run are refused
 - amounts are shown for a reader and never rounded
+- an answer for a customer already drafted is listed apart
 - every figure comes from the run files
 - refusals the history and a changed amount are shown
 - text from the model or the sheet is shown as text

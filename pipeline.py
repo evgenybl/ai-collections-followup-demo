@@ -346,16 +346,29 @@ def prepare(sheet, prompt_path, history=(), as_of=None, window_days=DEFAULT_WIND
 
 
 class RecordedBackend:
-    """A saved model answer, read from a file. A missing or unreadable file is refused (exit 2)."""
+    """A saved model answer, read from a file. A missing or unreadable file is refused (exit 2). It keeps the sha256
+    of the bytes it replayed, and reads the request_sha256 of the meta file beside it (<name>.meta.json), if any."""
 
     name = "recorded"
 
     def __init__(self, path):
         self.path = pathlib.Path(path)
         self.model = f"recorded:{self.path.name}"
+        self.sha256 = None
 
     def complete(self, request_text):
-        return read_file(self.path, "the recorded answer")
+        text = read_file(self.path, "the recorded answer")
+        self.sha256 = hashlib.sha256(self.path.read_bytes()).hexdigest()
+        return text
+
+    def meta_request_sha256(self):
+        """The request_sha256 of the meta file beside the answer, or None when there is no readable one."""
+        try:
+            meta = json.loads(self.path.with_name(self.path.stem + ".meta.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        value = meta.get("request_sha256") if isinstance(meta, dict) else None
+        return value if isinstance(value, str) else None
 
 
 class AnthropicBackend:
@@ -504,12 +517,10 @@ def note_problem(note, sheet_figures, key):
     return None
 
 
-def item_problem(item, expected, seen, priorities, key, left_out=frozenset()):
+def item_problem(item, expected, seen, priorities, key):
     """Why a call-list item cannot be accepted, or None when every check passes."""
     who = item.get("customer")
     amount, days, priority = item.get("amount"), item.get("days_late"), item.get("priority")
-    if isinstance(who, str) and who in left_out:
-        return "this customer was already drafted and was left out of the request"
     if not isinstance(who, str) or who not in expected:
         return "this customer is not in the sheet"
     c = expected[who]
@@ -532,16 +543,16 @@ def item_problem(item, expected, seen, priorities, key, left_out=frozenset()):
     return reminder_problem(item.get("reminder"), who, c, key) or reason_problem(item.get("reason"), c, key)
 
 
-def validate(answer, expected, key, left_out=frozenset()):
+def validate(answer, expected, key):
     """Split the call list into accepted and rejected items, each rejection with its reason, and list who is missing.
-    Split the notes for a person into accepted and rejected the same way. left_out holds the stand-ins that the run
-    history left out of the request. Returns (accepted, rejected, missing, notes, rejected_notes)."""
+    Split the notes for a person into accepted and rejected the same way.
+    Returns (accepted, rejected, missing, notes, rejected_notes)."""
     accepted, rejected, seen, priorities = [], [], set(), set()
     for item in answer["call_list"]:
         if not isinstance(item, dict):
             rejected.append({"item": str(item)[:80], "reason": "not an object"})
             continue
-        problem = item_problem(item, expected, seen, priorities, key, left_out)
+        problem = item_problem(item, expected, seen, priorities, key)
         if problem:
             rejected.append({"customer": str(item.get("customer", ""))[:80], "reason": problem})
             continue
@@ -579,13 +590,15 @@ def page_for_a_person(rejected, missing, notes, rejected_notes, key, history=Non
     lines += section("Customers who owe money and are missing from the answer:", missing)
     lines += section("Notes rejected by the checks:", [f"{r['note']} ({r['reason']})" for r in rejected_notes])
     if history is not None:
-        drafted, changed, window_days, everyone = history
+        drafted, changed, window_days, everyone, answered = history
         lines += section(f"Already drafted in the last {window_days} days, with the same total (left out of the "
                          "request):", [f"{who}: drafted on {r['exported_on']}, total {r['total']}"
                                        for who, r in sorted(drafted.items())])
         lines += section("Drafted again: the amount changed since the last draft:",
                          [f"{who}: {money(everyone[who]['total'])} now, {r['total']} when drafted on "
                           f"{r['exported_on']}" for who, r in sorted(changed.items())])
+        lines += section("Answered although already drafted (from an answer to another request; set aside, not "
+                         "counted as refused):", answered)
     lines += [f"Cells of call-list.csv written with a leading apostrophe, so that a spreadsheet shows them as text and "
               f"does not run them as formulas: {guarded}"]
     return pseudonymise.restore("\n".join(lines), key)
@@ -671,7 +684,14 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
     # When the history shows every owing customer as already drafted, there is nothing to ask the model.
     model_called = not drafted or any(c["total"] > 0 for c in prep["expected"].values())
     answer = parse_answer(backend.complete(prep["request"])) if model_called else {"call_list": [], "for_a_human": []}
-    accepted, rejected, missing, notes, rejected_notes = validate(answer, prep["expected"], key, frozenset(drafted))
+    # An item for a customer the history left out of the request cannot be a mistake about this request: it comes from
+    # an answer to another one (a recording replayed after an export). It is listed apart and not counted as refused.
+    def left_out(item):
+        return isinstance(item, dict) and isinstance(item.get("customer"), str) and item["customer"] in drafted
+
+    answered_drafted = sorted({item["customer"] for item in answer["call_list"] if left_out(item)})
+    answer = dict(answer, call_list=[item for item in answer["call_list"] if not left_out(item)])
+    accepted, rejected, missing, notes, rejected_notes = validate(answer, prep["expected"], key)
 
     def real(text):
         return pseudonymise.restore(text, key)
@@ -697,7 +717,7 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
                        "days_late": a["days_late"], "bucket": bucket_of(prep["expected"][a["customer"]]),
                        "file": name, "customer_key": prep["customer_keys"][a["customer"]],
                        "amount_changed": a["customer"] in changed})
-    page_history = (drafted, changed, window_days, prep["everyone"]) if history is not None else None
+    page_history = (drafted, changed, window_days, prep["everyone"], answered_drafted) if history is not None else None
     write_text(out_dir / "for-a-person.txt",
                page_for_a_person(rejected, missing, notes, rejected_notes, key, page_history, guarded) + "\n")
     # The same content, with the real names, in a form report.py can read without parsing the page.
@@ -714,6 +734,7 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
         "amount_changed": [{"customer": real(who), "total": money(prep["everyone"][who]["total"]),
                             "last_total": r["total"], "last_drafted_on": r["exported_on"]}
                            for who, r in sorted(changed.items())],
+        "answered_although_drafted": [real(who) for who in answered_drafted],
     })
     owing = {who: c for who, c in prep["everyone"].items() if c["total"] > 0}
     api_base = getattr(backend, "api_base", None)
@@ -743,6 +764,9 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
         "amount_changed": [{"customer": who, "total": money(prep["everyone"][who]["total"]),
                             "last_total": r["total"], "last_drafted_on": r["exported_on"]}
                            for who, r in sorted(changed.items())],
+        "answered_although_drafted": answered_drafted,
+        "answer_meta_request_sha256": backend.meta_request_sha256() if hasattr(backend, "meta_request_sha256")
+        else None,
         "drafts": drafts,
         "drafts_sha256": drafts_sha256,
     }
@@ -800,12 +824,17 @@ def main(argv=None):
             f"rejected notes {len(report['rejected_notes'])} | sent to customers {report['sent_to_customers']}")
     if report["history_lines"] is not None:
         line += (f" | history lines {report['history_lines']} | already drafted {len(report['already_drafted'])}"
-                 f" | amount changed {len(report['amount_changed'])}")
+                 f" | amount changed {len(report['amount_changed'])} | answered although drafted "
+                 f"{len(report['answered_although_drafted'])}")
     if not report["model_called"]:
         line += " | model not called: every owing customer was already drafted"
     if status is not None:
         line += f" | webhook {status}"
     print(line)
+    meta_request = report["answer_meta_request_sha256"]
+    if report["model_called"] and meta_request is not None and meta_request != report["request_sha256"]:
+        print("note: the replayed answer was saved for another request (its meta file's request_sha256 is not this "
+              "run's), so items for customers outside this request are listed apart")
     return 4 if isinstance(status, str) else 0
 
 

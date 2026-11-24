@@ -200,14 +200,31 @@ class HistoryTest(TempTest):
             self.assertIn("error: argument", err)
             self.assertFalse((self.base / "o").exists())
 
-    def test_a_customer_left_out_but_returned_by_the_model_is_rejected(self):
+    def test_an_answer_for_a_customer_left_out_is_listed_apart_and_not_counted_as_refused(self):
         history = self.history(self.line(self.who, days_before(1)))
-        answer = self.answer_file(constructed_answer(self.prep))  # it still holds the customer left out
+        answer = self.answer_file(constructed_answer(self.prep))  # an answer to the full request: it holds them
         report = pipeline.run(SHEET, PROMPT, pipeline.RecordedBackend(answer), self.base / "r", history=history,
                               as_of=AS_OF)
-        self.assertEqual(report["rejected"], [{"customer": self.who, "reason": "this customer was already drafted "
-                                                                                "and was left out of the request"}])
+        self.assertEqual((report["rejected"], report["answered_although_drafted"]), ([], [self.who]))
         self.assertEqual((report["missing_from_answer"], report["accepted"]), ([], len(self.owing) - 1))
+        page = (self.base / "r" / "for-a-person.txt").read_text(encoding="utf-8")
+        self.assertIn("Answered although already drafted (from an answer to another request; set aside, not counted "
+                      f"as refused):\n- {self.real_name}\n", page)
+        person = json.loads((self.base / "r" / "for-a-person.json").read_text(encoding="utf-8"))
+        self.assertEqual(person["answered_although_drafted"], [self.real_name])
+
+    def test_a_replayed_answer_saved_for_another_request_is_named_in_one_line(self):
+        history = self.history(self.line(self.who, days_before(1)))
+        code, printed, _ = call_main(pipeline, ["--out", str(self.base / "o"), "--history", str(history),
+                                                "--as-of", AS_OF.isoformat()])  # the shipped recording and its meta
+        self.assertEqual(code, 0)
+        lines = printed.splitlines()
+        self.assertIn("| answered although drafted 1", lines[0])
+        self.assertEqual(lines[1], "note: the replayed answer was saved for another request (its meta file's "
+                                   "request_sha256 is not this run's), so items for customers outside this request "
+                                   "are listed apart")
+        code, printed, _ = call_main(pipeline, ["--out", str(self.base / "same"), "--as-of", AS_OF.isoformat()])
+        self.assertEqual((code, len(printed.splitlines())), (0, 1))  # its own request: no note
 
     def test_print_request_leaves_the_drafted_customer_out(self):
         history = self.history(self.line(self.who, days_before(1)))

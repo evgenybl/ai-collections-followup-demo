@@ -214,7 +214,10 @@ def page(report, states, person, rows, reminders):
                         for r in person["already_drafted"]]),
                 "<p>Drafted again, because the amount changed since the last draft:</p>",
                 listed([f"{esc(r['customer'])}: {shown(r['total'])} now, {shown(r['last_total'])} when drafted on "
-                        f"{esc(r['last_drafted_on'])}" for r in person["amount_changed"]])]
+                        f"{esc(r['last_drafted_on'])}" for r in person["amount_changed"]]),
+                "<p>Answered although already drafted (from an answer to another request; set aside, not counted as "
+                "refused):</p>",
+                listed([esc(who) for who in person.get("answered_although_drafted", [])])]
     out += ["</section>"]
 
     out += ['<section id="notes">', "<h2>Notes for a person</h2>",
