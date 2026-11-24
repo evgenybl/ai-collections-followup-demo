@@ -100,7 +100,7 @@ way twice. Each wrong answer is the recorded answer with one documented change, 
 whenever the recording changes, and each case is judged against what the recorded answer itself gives. So the gallery
 shows what the checks do with a given mistake; it says nothing about how often a model makes it.
 
-**Ageing is derived when the sheet is read, never stored and never sent.** It comes from the largest delay among the
+**Ageing is derived when the sheet is read, never stored and never sent to the model.** It comes from the largest delay among the
 rows that still owe money, which is also the delay the answer's days_late must equal: a paid row's older delay is a
 figure of the customer's, not their delay. The model is not told the bucket, so the request, and the sha256 a recording
 is tied to, do not depend on it.
