@@ -865,8 +865,8 @@ def main(argv=None):
                                       "every owing customer is asked about, as before")
     ap.add_argument("--as-of", type=iso_date, help="the run's date, yyyy-mm-dd (default: today)")
     ap.add_argument("--window-days", type=positive_whole, default=DEFAULT_WINDOW_DAYS, metavar="N",
-                    help=f"the window: {WINDOW_DEFINITION} (default {DEFAULT_WINDOW_DAYS}); a customer with such a draft "
-                         "and the same total is not drafted again")
+                    help=f"the window: {WINDOW_DEFINITION} (default {DEFAULT_WINDOW_DAYS}); a customer with such a "
+                         "draft and the same total is not drafted again")
     args = ap.parse_args(argv)
     if not args.out and not args.print_request:
         ap.error("--out is required, except with --print-request")

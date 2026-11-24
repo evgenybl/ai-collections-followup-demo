@@ -162,7 +162,8 @@ class FormulaCellTest(TempTest):
             self.assertEqual(code, 2, repr(by))
             self.assertIn("--by may not start with =, +, -, @, a tab or a carriage return", err)
         self.assertFalse((out / "decisions.json").exists())
-        self.assertEqual(call_main(approval, ["approve", str(out), "--item", "1", "--by", "Ann-Marie (invented)"])[0], 0)
+        code, _, _ = call_main(approval, ["approve", str(out), "--item", "1", "--by", "Ann-Marie (invented)"])
+        self.assertEqual(code, 0)
         self.assertEqual(call_main(approval, ["export", str(out)])[0], 0)
         with (out / "approved" / "call-list.csv").open(encoding="utf-8-sig", newline="") as f:
             row = list(csv.reader(f))[1]
