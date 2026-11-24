@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-133 tests in 7 files.
+136 tests in 7 files.
 
 ## test_approval.py
 
@@ -10,8 +10,11 @@ Tests of the approval step: decisions recorded, appended and refused, and the ex
 
 ### ApprovalTest
 
+- a customer already exported inside the window is not exported again
 - a decision needs a known item a name a reason and a real timestamp
+- a failure after the history was appended puts it back
 - a folder that is not a run and a broken decisions file are refused
+- a history that cannot be written leaves nothing and the export can be tried again
 - an export appends after a last line without a line end
 - an export with nothing approved exports nothing and is not an error
 - approvals and rejections are recorded with who when and why

@@ -33,6 +33,7 @@ import re
 import shutil
 import sys
 import tempfile
+from decimal import Decimal
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -229,10 +230,31 @@ def append_history(path, lines):
         f.write("".join(line + "\n" for line in lines))
 
 
+def restore_history(path, existed, size):
+    """Put the run history back as it was before an append that did not complete: as long as it was, or absent."""
+    path = pathlib.Path(path)
+    if not existed:
+        if path.exists():
+            path.unlink()
+    elif path.stat().st_size != size:
+        with path.open("r+b") as f:
+            f.truncate(size)
+
+
+def move_into_place(work, target):
+    work.rename(target)
+
+
 def export(folder, history=None, as_of=None):
-    """Write approved/ with only the approved drafts, and append them to the run history. Returns a summary. Refused
-    (exit 2), with nothing written: approved/ exists; decisions.json names another run; a draft was changed; the
-    history file is corrupt or its folder does not exist."""
+    """Write approved/ with only the approved drafts, and append them to the run history. Returns a summary.
+
+    An approved item whose customer already has a history line inside the run's window (exported fewer than
+    window_days days before as_of) with the same total is not exported again, and is listed as already exported.
+
+    Refused (exit 2), with nothing written: approved/ exists; decisions.json names another run; a draft was changed;
+    the history file is corrupt or its folder does not exist. approved/ is built in a temporary folder, the history
+    is appended, and only then is the folder moved into place; when any step fails, the temporary folder is removed
+    and the history put back as it was, so that the export can be tried again."""
     folder = pathlib.Path(folder)
     report = load_run(folder)
     target = folder / APPROVED
@@ -241,36 +263,55 @@ def export(folder, history=None, as_of=None):
     decisions = load_decisions(folder, report)
     check_drafts(folder, report)
     as_of = as_of or datetime.date.today()
+    records = []
     if history is not None:
         if not pathlib.Path(history).parent.is_dir():
             raise PipelineError(f"the folder of the history file does not exist: {history}; nothing was written", 2)
-        pipeline.read_history(history, as_of)  # a corrupt history refuses here, before anything is written
+        records = pipeline.read_history(history, as_of)  # a corrupt history refuses here, before anything is written
     last = states(report, decisions)
     summary = {kind: [d["item"] for d in report["drafts"] if (last[d["item"]] or {}).get("decision") == kind]
                for kind in ("approved", "rejected")}
     summary["pending"] = [d["item"] for d in report["drafts"] if last[d["item"]] is None]
-    summary["history_lines"] = 0
-    approved = [d for d in sorted(report["drafts"], key=lambda d: d["item"]) if d["item"] in summary["approved"]]
+    summary.update(history_lines=0, exported=[], already_exported=[])
+    latest = pipeline.latest_inside_window(records, as_of, report.get("window_days", pipeline.DEFAULT_WINDOW_DAYS))
+    approved = []
+    for draft in sorted(report["drafts"], key=lambda d: d["item"]):
+        if draft["item"] not in summary["approved"]:
+            continue
+        line = latest.get(draft["customer_key"])
+        if line is not None and Decimal(line["total"]) == Decimal(draft["amount"]):
+            summary["already_exported"].append({"item": draft["item"], "exported_on": line["exported_on"]})
+        else:
+            approved.append(draft)
+    summary["exported"] = [d["item"] for d in approved]
     if not approved:
         return summary
     header, rows = call_list_rows(folder)
-    # Built in a temporary folder and renamed, so that approved/ is either complete or absent.
+    existed = history is not None and pathlib.Path(history).exists()
+    size = pathlib.Path(history).stat().st_size if existed else 0
     work = pathlib.Path(tempfile.mkdtemp(prefix=".approved-", dir=folder))
-    (work / "reminders").mkdir()
-    with (work / "call-list.csv").open("w", encoding="utf-8-sig", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(header + ["approved_by", "approved_at"])
+    try:
+        (work / "reminders").mkdir()
+        with (work / "call-list.csv").open("w", encoding="utf-8-sig", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(header + ["approved_by", "approved_at"])
+            for draft in approved:
+                w.writerow(pipeline.safe_cells(rows[draft["item"]] + [last[draft["item"]]["by"],
+                                                                      last[draft["item"]]["at"]])[0])
         for draft in approved:
-            w.writerow(pipeline.safe_cells(rows[draft["item"]] + [last[draft["item"]]["by"],
-                                                                  last[draft["item"]]["at"]])[0])
-    for draft in approved:
-        shutil.copyfile(folder / draft["file"], work / draft["file"])
-    work.rename(target)
-    if history is not None:
-        append_history(history, [json.dumps({"customer_key": d["customer_key"], "exported_on": as_of.isoformat(),
-                                             "total": d["amount"], "request_sha256": report["request_sha256"]})
-                                 for d in approved])
-        summary["history_lines"] = len(approved)
+            shutil.copyfile(folder / draft["file"], work / draft["file"])
+        if history is not None:
+            append_history(history, [json.dumps({"customer_key": d["customer_key"], "exported_on": as_of.isoformat(),
+                                                 "total": d["amount"], "request_sha256": report["request_sha256"]})
+                                     for d in approved])
+        move_into_place(work, target)
+    except OSError as exc:
+        if history is not None:
+            restore_history(history, existed, size)
+        shutil.rmtree(work, ignore_errors=True)
+        raise PipelineError(f"the export could not be completed ({exc}); nothing was exported, the history is as it "
+                            "was, and the export can be tried again", 2)
+    summary["history_lines"] = len(approved) if history is not None else 0
     return summary
 
 
@@ -324,9 +365,16 @@ def main(argv=None):
             print(f"item {entry['item']}: {state_text(entry)}")
         else:
             summary = export(args.run, args.history, args.as_of)
-            done = (f"exported items {', '.join(str(i) for i in summary['approved'])} to {APPROVED}/"
-                    if summary["approved"] else "nothing approved: nothing exported")
+            if summary["exported"]:
+                done = f"exported items {', '.join(str(i) for i in summary['exported'])} to {APPROVED}/"
+            elif summary["approved"]:
+                done = "nothing exported: every approved item was already exported"
+            else:
+                done = "nothing approved: nothing exported"
             line = f"{done} | rejected {len(summary['rejected'])} | pending {len(summary['pending'])}"
+            if summary["already_exported"]:
+                line += " | already exported: " + ", ".join(f"item {e['item']} on {e['exported_on']}"
+                                                            for e in summary["already_exported"])
             if args.history is not None:
                 line += f" | history lines added {summary['history_lines']}"
             print(line + " | sent to customers 0")

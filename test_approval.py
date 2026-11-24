@@ -2,10 +2,13 @@
 Run: python -I test_approval.py  (every test file: python -I run_tests.py)"""
 import csv
 import json
+import os
 import pathlib
 import shutil
+import stat
 import sys
 import unittest
+from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -222,6 +225,70 @@ class ApprovalTest(TempTest):
                                             str(self.base / "no-such-folder" / "h.jsonl")])
         self.assertEqual(code, 2)
         self.assertIn("the folder of the history file does not exist", err)
+
+    def assert_nothing_exported_and_history(self, before):
+        self.assertFalse((self.run_dir / "approved").exists())
+        self.assertEqual([p.name for p in self.run_dir.iterdir() if p.name.startswith(".approved-")], [])
+        self.assertEqual(self.history.read_bytes(), before)
+
+    def test_a_history_that_cannot_be_written_leaves_nothing_and_the_export_can_be_tried_again(self):
+        self.decide("approve", 1)
+        self.history.write_bytes(b"")
+        os.chmod(self.history, stat.S_IREAD)
+        try:
+            if os.access(self.history, os.W_OK):
+                self.skipTest("this account can write a read-only file")
+            code, _, err = self.export()
+        finally:
+            os.chmod(self.history, stat.S_IREAD | stat.S_IWRITE)
+        self.assertEqual(code, 2)
+        self.assertIn("the export could not be completed", err)
+        self.assert_nothing_exported_and_history(b"")
+        self.assertEqual(self.export()[0], 0)
+        self.assertTrue((self.run_dir / "approved" / "reminders" / "reminder-01.txt").is_file())
+        self.assertEqual(len(self.history.read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_a_failure_after_the_history_was_appended_puts_it_back(self):
+        self.decide("approve", 1)
+        earlier = self.report["drafts"][1]
+        self.history.write_text(json.dumps({"customer_key": earlier["customer_key"], "exported_on": "2026-11-01",
+                                            "total": earlier["amount"], "request_sha256": "ab" * 32}) + "\n",
+                                encoding="utf-8")
+        before = self.history.read_bytes()
+        with mock.patch.object(approval, "move_into_place", side_effect=OSError("the disk is full")):
+            code, _, err = self.export()
+        self.assertEqual(code, 2)
+        self.assertIn("(the disk is full); nothing was exported, the history is as it was", err)
+        self.assert_nothing_exported_and_history(before)
+        self.assertEqual(self.export()[0], 0)
+        self.assertEqual(len(self.history.read_text(encoding="utf-8").splitlines()), 2)
+
+    def test_a_customer_already_exported_inside_the_window_is_not_exported_again(self):
+        second, third = self.run_pipeline("second"), self.run_pipeline("third")  # the same drafts, before any export
+        for item in (1, 2):
+            self.decide("approve", item)
+        self.decide("approve", 1, run=second)
+        self.decide("approve", 1, run=third)
+        self.decide("approve", 3, run=third)
+        self.assertEqual(self.export()[0], 0)
+        pending = len(self.report["drafts"]) - 1
+        code, printed, _ = self.export(run=second)
+        self.assertEqual((code, printed), (0, f"nothing exported: every approved item was already exported | "
+                                              f"rejected 0 | pending {pending} | already exported: item 1 on {AS_OF} "
+                                              f"| history lines added 0 | sent to customers 0\n"))
+        self.assertFalse((second / "approved").exists())
+        code, printed, _ = self.export(run=third)
+        self.assertEqual(code, 0)
+        self.assertTrue(printed.startswith("exported items 3 to approved/ |"))
+        self.assertIn(f"| already exported: item 1 on {AS_OF} | history lines added 1 |", printed)
+        self.assertEqual(sorted(p.name for p in (third / "approved" / "reminders").iterdir()), ["reminder-03.txt"])
+        # Seven days later the first export is outside the window: the same customer is exported again.
+        later = self.run_pipeline("later")
+        self.decide("approve", 1, run=later)
+        code, printed, _ = call_main(approval, ["export", str(later), "--history", str(self.history),
+                                                "--as-of", "2026-12-01"])
+        self.assertEqual(code, 0)
+        self.assertTrue(printed.startswith("exported items 1 to approved/ |"), printed)
 
     def test_an_export_appends_after_a_last_line_without_a_line_end(self):
         self.decide("approve", 1)

@@ -314,16 +314,23 @@ def read_history(path, as_of):
     return records
 
 
-def earlier_drafts(history, keys, expected, as_of, window_days):
-    """Which owing customers were exported inside the window: the latest such line of each customer counts (a later
-    line of the same date wins). Returns two dicts, stand-in -> that line: the customers whose total is the same,
-    who are left out of the request, and those whose total changed, who are drafted again and marked."""
+def latest_inside_window(history, as_of, window_days):
+    """customer key -> the latest history line inside the window: exported fewer than window_days days before as_of,
+    so ages 0 to window_days - 1. Of two lines of the same date, the later one in the file counts."""
     latest = {}
     for record in history:
         if (as_of - record["date"]).days < window_days:
             seen = latest.get(record["customer_key"])
             if seen is None or record["date"] >= seen["date"]:
                 latest[record["customer_key"]] = record
+    return latest
+
+
+def earlier_drafts(history, keys, expected, as_of, window_days):
+    """Which owing customers were exported inside the window: the latest such line of each customer counts (a later
+    line of the same date wins). Returns two dicts, stand-in -> that line: the customers whose total is the same,
+    who are left out of the request, and those whose total changed, who are drafted again and marked."""
+    latest = latest_inside_window(history, as_of, window_days)
     drafted, changed = {}, {}
     for who, c in expected.items():
         record = latest.get(keys[who])
