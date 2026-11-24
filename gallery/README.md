@@ -38,12 +38,7 @@ The four cases that read this folder are also one pipeline command each, for exa
 
 ## How a case is judged
 
-- The recorded answer is one real answer from a model. On the shipped sheet the checks accept all 22 owing customers
-  and reject nothing, and they set aside one of its notes for a person: "Customers 008, 019 and 020 did not answer the
-  phone; the table suggests email instead." (the note states a figure that is not in the sheet: 19, 20). In substance
-  the note is right: those three customers' notes say the phone was not answered. But only a stand-in written in full,
-  such as `Customer 019`, counts as one, so "019" and "020" read as figures the sheet does not have. The check is
-  strict on purpose and shows a person a note it cannot confirm; it is not softened to let this one through.
+- On the shipped sheet the checks accept all 22 owing customers of the recorded answer and reject nothing.
 - `wrong-total` and `invented-customer` are judged against what the recorded answer itself gives on the sheet: exactly
   one more rejection, of the right kind, and every other item kept as before.
 - `second-run` approves and exports every draft of the first run, then runs again inside the window. The recorded

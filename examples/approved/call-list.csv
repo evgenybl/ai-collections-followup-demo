@@ -1,3 +1,3 @@
 ﻿priority,customer,amount,days_late,bucket,reason,approved_by,approved_at
-1,Cobalt Florist (invented),2215.35,173,over 90,"Longest delay in the table at 173 days, with a smaller amount.",Reviewer One (invented),2026-11-24T09:00:00Z
-4,Bramble Framing (invented),13995,75,61-90,"75 days late; it promised to pay by the end of the month, so check that promise.",Reviewer One (invented),2026-11-24T09:01:00Z
+3,Bramble Framing (invented),13995,75,61-90,"75 days late on 13995 owed, and it promised to pay by the end of the month, so check whether that promise holds.",Reviewer One (invented),2026-11-24T09:00:00Z
+5,Lantern Locksmiths (invented),14171.5,64,61-90,"64 days late on 14171.50 owed, and it promised to pay by the end of the month.",Reviewer One (invented),2026-11-24T09:01:00Z

@@ -1,14 +1,18 @@
 For a person to read. It holds real names: keep it on this computer.
 
 Notes from the model:
-- Cobalt Bakery (invented) disputes the invoice, saying the work was not finished; check the work before pursuing payment.
-- Kestrel Florist (invented) disputes the invoice, saying the work was not finished; resolve the dispute before pursuing payment.
-- Orchard Bicycle Repairs (invented) says the invoice never arrived; confirm and resend it.
-- Sorrel Bookbinding (invented) says the invoice never arrived; confirm and resend it.
-- Juniper Tile Works (invented) says the invoice never arrived; confirm and resend it.
-- Quarry Laundry (invented) asked to split the payment into two instalments; decide whether to agree.
-- Linden Florist (invented) asked to split the payment into two instalments; decide whether to agree.
-- Granite Upholstery (invented) asked to split the payment into two instalments; decide whether to agree.
+- Cobalt Bakery (invented) disputes the invoice (says the work was not finished) and is 123 days late; the dispute should be settled before payment is pressed.
+- Kestrel Florist (invented) disputes the invoice (says the work was not finished) and owes the largest total in the table with no days late; the dispute needs review.
+- Orchard Bicycle Repairs (invented) says the invoice never arrived, so it should be resent.
+- Sorrel Bookbinding (invented) says the invoice never arrived and is 55 days late; resend the invoice.
+- Juniper Tile Works (invented) says the invoice never arrived; resend the invoice.
+- Quarry Laundry (invented) asked to split the payment into two instalments; a person must decide the instalment plan.
+- Linden Florist (invented) asked to split the payment into two instalments; a person must decide the instalment plan.
+- Granite Upholstery (invented) asked to split the payment into two instalments; a person must decide the instalment plan.
+- Willow Garden Supplies (invented) does not answer on 000-000-0008; try willow-garden-supplies@example.com instead.
+- Riverbend Bicycle Repairs (invented) does not answer on 000-000-0019; try riverbend-bicycle-repairs@example.com instead.
+- Meadow Print Shop (invented) does not answer on 000-000-0020; try meadow-print-shop@example.com instead.
+- Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept.
 
 Items rejected by the checks (not in the call list):
 - none
@@ -17,5 +21,5 @@ Customers who owe money and are missing from the answer:
 - none
 
 Notes rejected by the checks:
-- Customers 008, 019 and 020 did not answer the phone; the table suggests email instead. (the note states a figure that is not in the sheet: 19, 20)
+- none
 

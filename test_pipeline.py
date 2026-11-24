@@ -22,10 +22,11 @@ sys.path.insert(0, str(HERE))
 import pipeline  # noqa: E402
 import pseudonymise  # noqa: E402
 
-# The six-row sheet and the real model answer recorded for it are kept in fixtures/, so that these tests run on the
-# data they were written for. The shipped sheet is generated now (make_sheet.py); test_sheet.py covers it.
+# The six-row sheet, the prompt of that time and the real model answer recorded for both are kept in fixtures/, so
+# that these tests run on the data they were written for. The shipped sheet is generated now (make_sheet.py), and the
+# shipped prompt has changed since; test_sheet.py covers them.
 SHEET = HERE / "fixtures" / "customers.six-rows.csv"
-PROMPT = HERE / "prompt.txt"
+PROMPT = HERE / "fixtures" / "prompt.six-rows.txt"
 RECORDED = HERE / "fixtures" / "recorded-answer.six-rows.json"
 META = HERE / "fixtures" / "recorded-answer.six-rows.meta.json"
 TEST_KEY = "unit" + "-" + "test" + "-" + "placeholder"
@@ -177,7 +178,7 @@ class RequestTest(unittest.TestCase):
 
     def test_print_request_prints_the_exact_request_and_needs_no_out(self):
         proc = subprocess.run([sys.executable, "-I", "-B", str(HERE / "pipeline.py"), "--print-request",
-                               "--sheet", str(SHEET)], capture_output=True, timeout=60)
+                               "--sheet", str(SHEET), "--prompt", str(PROMPT)], capture_output=True, timeout=60)
         request = pipeline.prepare(SHEET, PROMPT)["request"]
         self.assertEqual((proc.returncode, proc.stdout), (0, request.encode("utf-8")))
         code, _, err = call_main(pipeline, [])

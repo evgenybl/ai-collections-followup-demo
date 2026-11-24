@@ -58,7 +58,7 @@ Tests of the failure gallery (demo.py and gallery/), the examples and the list o
 
 The README quotes real output; these tests hold it to that.
 
-- every text about the recording names the note the checks set aside
+- no text describes an earlier recording
 - the call list sample is the first five lines of the example
 - the decision commands print what the readme quotes
 - the opening is the title then the badges then two sentences
@@ -182,9 +182,9 @@ Tests of the generated sheet (make_sheet.py), the ageing buckets, and the shippe
 
 ### RecordedAnswerTest
 
+- the answer file has not changed since it was saved
 - the constructed answer passes every check
-- the shipped answer file is the recording byte for byte
-- the shipped recorded answer meta file matches the request
+- the recorded answer was saved for the request built today
 - the shipped recorded answer runs through the guard
 
 ### SheetGeneratorTest

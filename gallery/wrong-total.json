@@ -1,191 +1,194 @@
 {
  "call_list": [
   {
-   "customer": "Customer 022",
+   "customer": "Customer 002",
    "priority": 1,
-   "amount": 2215.35,
-   "days_late": 173,
-   "reason": "Longest delay in the table at 173 days, with a smaller amount.",
-   "reminder": "Dear Customer 022, this is a friendly reminder that an amount of 2215.35 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "amount": 12295,
+   "days_late": 123,
+   "reason": "123 days late on 12295 owed, and the invoice is disputed, so the dispute needs settling on the call.",
+   "reminder": "Dear Customer 002, this is a friendly reminder that a total of 12295 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 012",
    "priority": 2,
    "amount": 13685,
    "days_late": 98,
-   "reason": "98 days late, and it asked to split the payment into two instalments.",
-   "reminder": "Dear Customer 012, this is a friendly reminder that an amount of 13585 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
-  },
-  {
-   "customer": "Customer 010",
-   "priority": 3,
-   "amount": 21655,
-   "days_late": 47,
-   "reason": "47 days late on a large debt, and it says the invoice never arrived, so resend it on the call.",
-   "reminder": "Dear Customer 010, this is a friendly reminder that an amount of 21655 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "98 days late on 13585 owed, and it has asked to split the payment into two instalments.",
+   "reminder": "Dear Customer 012, this is a friendly reminder that a total of 13585 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 007",
-   "priority": 4,
+   "priority": 3,
    "amount": 13995,
    "days_late": 75,
-   "reason": "75 days late; it promised to pay by the end of the month, so check that promise.",
-   "reminder": "Dear Customer 007, this is a friendly reminder that an amount of 13995 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "75 days late on 13995 owed, and it promised to pay by the end of the month, so check whether that promise holds.",
+   "reminder": "Dear Customer 007, this is a friendly reminder that a total of 13995 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
+  },
+  {
+   "customer": "Customer 010",
+   "priority": 4,
+   "amount": 21655,
+   "days_late": 47,
+   "reason": "47 days late on 21655 owed, and it says the invoice never arrived, so the invoice should be resent first.",
+   "reminder": "Dear Customer 010, this is a friendly reminder that a total of 21655 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 016",
    "priority": 5,
    "amount": 14171.5,
    "days_late": 64,
-   "reason": "64 days late on a large debt; it promised to pay by the end of the month.",
-   "reminder": "Dear Customer 016, this is a friendly reminder that an amount of 14171.5 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
-  },
-  {
-   "customer": "Customer 020",
-   "priority": 6,
-   "amount": 22545.35,
-   "days_late": 22,
-   "reason": "Large debt, 22 days late; it did not answer the phone, so try email.",
-   "reminder": "Dear Customer 020, this is a friendly reminder that an amount of 22545.35 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "64 days late on 14171.50 owed, and it promised to pay by the end of the month.",
+   "reminder": "Dear Customer 016, this is a friendly reminder that a total of 14171.50 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 015",
-   "priority": 7,
+   "priority": 6,
    "amount": 12910,
    "days_late": 50,
-   "reason": "50 days late, with no notes.",
-   "reminder": "Dear Customer 015, this is a friendly reminder that an amount of 12910 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
-  },
-  {
-   "customer": "Customer 001",
-   "priority": 8,
-   "amount": 20520,
-   "days_late": 16,
-   "reason": "16 days late on a large debt; identity was already verified.",
-   "reminder": "Dear Customer 001, this is a friendly reminder that an amount of 20520 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
-  },
-  {
-   "customer": "Customer 025",
-   "priority": 9,
-   "amount": 25741.55,
-   "days_late": 5,
-   "reason": "At most 5 days late; it asked to split the payment into two instalments.",
-   "reminder": "Dear Customer 025, this is a friendly reminder that an amount of 25741.55 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "50 days late on 12910 owed, with no notes on the account.",
+   "reminder": "Dear Customer 015, this is a friendly reminder that a total of 12910 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 023",
-   "priority": 10,
+   "priority": 7,
    "amount": 7670,
    "days_late": 81,
-   "reason": "81 days late; identity was already verified.",
-   "reminder": "Dear Customer 023, this is a friendly reminder that an amount of 7670 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "81 days late on 7670 owed, and the identity has been verified.",
+   "reminder": "Dear Customer 023, this is a friendly reminder that a total of 7670 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
-   "customer": "Customer 019",
-   "priority": 11,
-   "amount": 17025.9,
-   "days_late": 18,
-   "reason": "18 days late; it did not answer the phone, so try email.",
-   "reminder": "Dear Customer 019, this is a friendly reminder that an amount of 17025.9 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "customer": "Customer 020",
+   "priority": 8,
+   "amount": 22545.35,
+   "days_late": 22,
+   "reason": "22 days late on 22545.35 owed, and the phone goes unanswered, so the email should be tried.",
+   "reminder": "Dear Customer 020, this is a friendly reminder that a total of 22545.35 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 013",
-   "priority": 12,
+   "priority": 9,
    "amount": 7770,
    "days_late": 51,
-   "reason": "51 days late; identity was already verified.",
-   "reminder": "Dear Customer 013, this is a friendly reminder that an amount of 7770 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "51 days late on 7770 owed, and the identity has been verified.",
+   "reminder": "Dear Customer 013, this is a friendly reminder that a total of 7770 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
-   "customer": "Customer 014",
-   "priority": 13,
-   "amount": 15760,
-   "days_late": 9,
-   "reason": "9 days late, with no notes.",
-   "reminder": "Dear Customer 014, this is a friendly reminder that an amount of 15760 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "customer": "Customer 022",
+   "priority": 10,
+   "amount": 2215.35,
+   "days_late": 173,
+   "reason": "173 days late on 2215.35 owed, the longest delay in the table.",
+   "reminder": "Dear Customer 022, this is a friendly reminder that a total of 2215.35 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 009",
-   "priority": 14,
+   "priority": 11,
    "amount": 6685.95,
    "days_late": 55,
-   "reason": "55 days late; it says the invoice never arrived, so resend it on the call.",
-   "reminder": "Dear Customer 009, this is a friendly reminder that an amount of 6685.95 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "55 days late on 6685.95 owed, and it says the invoice never arrived, so the invoice should be resent first.",
+   "reminder": "Dear Customer 009, this is a friendly reminder that a total of 6685.95 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
-   "customer": "Customer 005",
-   "priority": 15,
-   "amount": 14240.35,
-   "days_late": 8,
-   "reason": "8 days late; it promised to pay by the end of the month.",
-   "reminder": "Dear Customer 005, this is a friendly reminder that an amount of 14240.35 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "customer": "Customer 001",
+   "priority": 12,
+   "amount": 20520,
+   "days_late": 16,
+   "reason": "16 days late on 20520 owed, and the identity has been verified.",
+   "reminder": "Dear Customer 001, this is a friendly reminder that a total of 20520 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
+  },
+  {
+   "customer": "Customer 019",
+   "priority": 13,
+   "amount": 17025.9,
+   "days_late": 18,
+   "reason": "18 days late on 17025.90 owed, and the phone goes unanswered, so the email should be tried.",
+   "reminder": "Dear Customer 019, this is a friendly reminder that a total of 17025.90 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 018",
-   "priority": 16,
+   "priority": 14,
    "amount": 7401.6,
    "days_late": 36,
-   "reason": "36 days late; it asked to split the payment into two instalments.",
-   "reminder": "Dear Customer 018, this is a friendly reminder that an amount of 7401.6 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "36 days late on 7401.60 owed, and it has asked to split the payment into two instalments.",
+   "reminder": "Dear Customer 018, this is a friendly reminder that a total of 7401.60 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
-   "customer": "Customer 021",
-   "priority": 17,
-   "amount": 12345,
-   "days_late": 0,
-   "reason": "Not yet late, with no notes.",
-   "reminder": "Dear Customer 021, this is a friendly reminder that an amount of 12345 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
-  },
-  {
-   "customer": "Customer 024",
-   "priority": 18,
-   "amount": 4795,
-   "days_late": 27,
-   "reason": "27 days late, with no notes.",
-   "reminder": "Dear Customer 024, this is a friendly reminder that an amount of 4795 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "customer": "Customer 014",
+   "priority": 15,
+   "amount": 15760,
+   "days_late": 9,
+   "reason": "9 days late on 15760 owed, with no notes on the account.",
+   "reminder": "Dear Customer 014, this is a friendly reminder that a total of 15760 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 008",
-   "priority": 19,
+   "priority": 16,
    "amount": 2965,
    "days_late": 45,
-   "reason": "45 days late; it did not answer the phone, so try email.",
-   "reminder": "Dear Customer 008, this is a friendly reminder that an amount of 2965 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "45 days late on 2965 owed, and the phone goes unanswered, so the email should be tried.",
+   "reminder": "Dear Customer 008, this is a friendly reminder that a total of 2965 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
-   "customer": "Customer 002",
-   "priority": 20,
-   "amount": 12295,
-   "days_late": 123,
-   "reason": "123 days late, but it disputes the invoice, so resolve the dispute before pressing for payment.",
-   "reminder": "Dear Customer 002, this is a friendly reminder that an amount of 12295 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "customer": "Customer 024",
+   "priority": 17,
+   "amount": 4795,
+   "days_late": 27,
+   "reason": "27 days late on 4795 owed, with no notes on the account.",
+   "reminder": "Dear Customer 024, this is a friendly reminder that a total of 4795 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
+  },
+  {
+   "customer": "Customer 025",
+   "priority": 18,
+   "amount": 25741.55,
+   "days_late": 5,
+   "reason": "5 days late on 25741.55 owed, and it has asked to split the payment into two instalments.",
+   "reminder": "Dear Customer 025, this is a friendly reminder that a total of 25741.55 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
+  },
+  {
+   "customer": "Customer 005",
+   "priority": 19,
+   "amount": 14240.35,
+   "days_late": 8,
+   "reason": "8 days late on 14240.35 owed, and it promised to pay by the end of the month.",
+   "reminder": "Dear Customer 005, this is a friendly reminder that a total of 14240.35 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 003",
-   "priority": 21,
+   "priority": 20,
    "amount": 34256.4,
    "days_late": 0,
-   "reason": "No days late, but it disputes the invoice, so the dispute comes first.",
-   "reminder": "Dear Customer 003, this is a friendly reminder that an amount of 34256.4 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "The largest total owed at 34256.40 but none of it is late, and the invoice is disputed, so the dispute should be settled first.",
+   "reminder": "Dear Customer 003, this is a friendly reminder that a total of 34256.40 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
+  },
+  {
+   "customer": "Customer 021",
+   "priority": 21,
+   "amount": 12345,
+   "days_late": 0,
+   "reason": "12345 owed with 0 days late, so it ranks after the overdue accounts.",
+   "reminder": "Dear Customer 021, this is a friendly reminder that a total of 12345 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   },
   {
    "customer": "Customer 004",
    "priority": 22,
    "amount": 330.95,
    "days_late": 0,
-   "reason": "No days late, but it says the invoice never arrived, so resend it.",
-   "reminder": "Dear Customer 004, this is a friendly reminder that an amount of 330.95 is outstanding on your account. Please arrange payment at your earliest convenience. Thank you."
+   "reason": "330.95 owed with 0 days late, and it says the invoice never arrived, so the invoice should be resent first.",
+   "reminder": "Dear Customer 004, this is a friendly reminder that a total of 330.95 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you."
   }
  ],
  "for_a_human": [
-  "Customer 002 disputes the invoice, saying the work was not finished; check the work before pursuing payment.",
-  "Customer 003 disputes the invoice, saying the work was not finished; resolve the dispute before pursuing payment.",
-  "Customer 004 says the invoice never arrived; confirm and resend it.",
-  "Customer 009 says the invoice never arrived; confirm and resend it.",
-  "Customer 010 says the invoice never arrived; confirm and resend it.",
-  "Customer 012 asked to split the payment into two instalments; decide whether to agree.",
-  "Customer 018 asked to split the payment into two instalments; decide whether to agree.",
-  "Customer 025 asked to split the payment into two instalments; decide whether to agree.",
-  "Customers 008, 019 and 020 did not answer the phone; the table suggests email instead."
+  "Customer 002 disputes the invoice (says the work was not finished) and is 123 days late; the dispute should be settled before payment is pressed.",
+  "Customer 003 disputes the invoice (says the work was not finished) and owes the largest total in the table with no days late; the dispute needs review.",
+  "Customer 004 says the invoice never arrived, so it should be resent.",
+  "Customer 009 says the invoice never arrived and is 55 days late; resend the invoice.",
+  "Customer 010 says the invoice never arrived; resend the invoice.",
+  "Customer 012 asked to split the payment into two instalments; a person must decide the instalment plan.",
+  "Customer 018 asked to split the payment into two instalments; a person must decide the instalment plan.",
+  "Customer 025 asked to split the payment into two instalments; a person must decide the instalment plan.",
+  "Customer 008 does not answer on Phone 008; try Email 008 instead.",
+  "Customer 019 does not answer on Phone 019; try Email 019 instead.",
+  "Customer 020 does not answer on Phone 020; try Email 020 instead.",
+  "Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept."
  ]
 }

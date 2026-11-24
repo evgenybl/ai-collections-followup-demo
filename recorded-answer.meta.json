@@ -2,6 +2,6 @@
  "model": "claude-haiku-5-5",
  "recorded_on": "2026-11-24",
  "route": "a Claude Code subagent given the request text as its whole prompt; the answer saved as returned",
- "request_sha256": "b78d46470f5f6128ab7d8882133153a8f2133309e7f65e7f0f114ce674730a49",
- "answer_sha256": "2fe8b97837a27d42df9ff16dd62cbcd46dff1d11d1cecabbb781995606f69a5b"
+ "request_sha256": "8cd58a359ac00681edeacdb8e2334d1fa57d8ce0fd530d41ea17e7cedc4728aa",
+ "answer_sha256": "253d62887849e1c3905fa8ab6384b7216ca09e603786956c622c8deae4b35757"
 }

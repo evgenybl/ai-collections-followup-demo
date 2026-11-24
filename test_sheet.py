@@ -16,7 +16,7 @@ from testsupport import (META, PROMPT, RECORDED, SHEET, TempTest, call_main, con
                          constructed_answer_text)
 
 # The sha256 of recorded-answer.json as the model returned it, so that an edited recording is caught.
-ANSWER_SHA256 = "2fe8b97837a27d42df9ff16dd62cbcd46dff1d11d1cecabbb781995606f69a5b"
+ANSWER_SHA256 = "253d62887849e1c3905fa8ab6384b7216ca09e603786956c622c8deae4b35757"
 
 
 def customers(rows):
@@ -135,35 +135,29 @@ class AgeingTest(TempTest):
 
 
 class RecordedAnswerTest(TempTest):
-    def test_the_shipped_recorded_answer_meta_file_matches_the_request(self):
+    def test_the_recorded_answer_was_saved_for_the_request_built_today(self):
         meta = json.loads(META.read_text(encoding="utf-8"))
         self.assertEqual(sorted(meta), ["answer_sha256", "model", "recorded_on", "request_sha256", "route"])
         request = pipeline.prepare(SHEET, PROMPT)["request"]
         self.assertEqual(meta["request_sha256"], hashlib.sha256(request.encode("utf-8")).hexdigest(),
                          "the prompt or the sheet changed since the answer was recorded: record it again")
 
-    def test_the_shipped_answer_file_is_the_recording_byte_for_byte(self):
+    def test_the_answer_file_has_not_changed_since_it_was_saved(self):
+        """The sha256 proves only this, and that the file answers the request built today (the test above). That a
+        model wrote it is the author's statement, which no file here can prove."""
         meta = json.loads(META.read_text(encoding="utf-8"))
         self.assertEqual(meta["answer_sha256"], ANSWER_SHA256)
         self.assertEqual(hashlib.sha256(RECORDED.read_bytes()).hexdigest(), ANSWER_SHA256,
-                         "recorded-answer.json is not the answer as the model returned it")
+                         "recorded-answer.json has changed since it was saved")
 
     def test_the_shipped_recorded_answer_runs_through_the_guard(self):
         out = self.base / "rec"
         report = pipeline.run(SHEET, PROMPT, pipeline.RecordedBackend(RECORDED), out)
-        # The real recording: every owing customer accepted, every figure right, and one note for a person set aside.
+        # What the checks do with the recording: every owing customer accepted, every figure right.
         self.assertEqual((report["customers_owing"], report["accepted"]), (22, 22))
-        self.assertEqual((report["rejected"], report["missing_from_answer"]), ([], []))
-        self.assertEqual(report["rejected_notes"], [{
-            "note": "Customers 008, 019 and 020 did not answer the phone; the table suggests email instead.",
-            "reason": "the note states a figure that is not in the sheet: 19, 20"}])
-        # A false alarm in substance: the three are real customers whose notes say the phone was not answered. The
-        # check reads "019" and "020" as figures because only a stand-in written in full counts, and it stays strict.
-        notes = pipeline.prepare(SHEET, PROMPT)["clean"]
-        for who in ("Customer 008", "Customer 019", "Customer 020"):
-            self.assertTrue(any(r["name"] == who and r["notes"].startswith("No answer on") for r in notes), who)
+        self.assertEqual((report["rejected"], report["missing_from_answer"], report["rejected_notes"]), ([], [], []))
         first = (out / "call-list.csv").read_text(encoding="utf-8-sig").splitlines()[1]
-        self.assertTrue(first.startswith("1,Cobalt Florist (invented),2215.35,173,over 90,"), first)
+        self.assertTrue(first.startswith("1,Cobalt Bakery (invented),12295,123,over 90,"), first)
 
     def test_the_constructed_answer_passes_every_check(self):
         prep = pipeline.prepare(SHEET, PROMPT)

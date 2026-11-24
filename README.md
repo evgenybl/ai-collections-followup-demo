@@ -16,10 +16,10 @@ The first five lines of the call list the example run drafted, from [`examples/c
 
 ```
 priority,customer,amount,days_late,bucket,reason
-1,Cobalt Florist (invented),2215.35,173,over 90,"Longest delay in the table at 173 days, with a smaller amount."
-2,Quarry Laundry (invented),13585,98,over 90,"98 days late, and it asked to split the payment into two instalments."
-3,Juniper Tile Works (invented),21655,47,31-60,"47 days late on a large debt, and it says the invoice never arrived, so resend it on the call."
-4,Bramble Framing (invented),13995,75,61-90,"75 days late; it promised to pay by the end of the month, so check that promise."
+1,Cobalt Bakery (invented),12295,123,over 90,"123 days late on 12295 owed, and the invoice is disputed, so the dispute needs settling on the call."
+2,Quarry Laundry (invented),13585,98,over 90,"98 days late on 13585 owed, and it has asked to split the payment into two instalments."
+3,Bramble Framing (invented),13995,75,61-90,"75 days late on 13995 owed, and it promised to pay by the end of the month, so check whether that promise holds."
+4,Juniper Tile Works (invented),21655,47,31-60,"47 days late on 21655 owed, and it says the invoice never arrived, so the invoice should be resent first."
 ```
 
 The order and the reasons are a real model's, from the recorded answer; every figure in them was checked against the sheet.
@@ -35,7 +35,7 @@ python -I demo.py --out out-demo
 runs the ten cases of the failure gallery. It prints a detailed line for each case, then the closing table shown above. The first line:
 
 ```
-happy-path | expected: exit 0; the export holds only the approved drafts | happened: exit 0; 22 drafts; items 1 and 4 approved, item 2 rejected (a note names it), 19 pending; the export holds reminders reminder-01.txt, reminder-04.txt and call-list lines 1, 4; history lines 2; report written | PASS
+happy-path | expected: exit 0; the export holds only the approved drafts | happened: exit 0; 22 drafts; items 3 and 5 approved, item 1 rejected (a note names it), 19 pending; the export holds reminders reminder-03.txt, reminder-05.txt and call-list lines 3, 5; history lines 2; report written | PASS
 ```
 
 ```
@@ -64,13 +64,13 @@ A run of the pipeline drafts; nothing leaves its folder until a person decides. 
 
 ```
 $ python -I pipeline.py --out out-run
-backend recorded | owing 22 | accepted 22 | rejected 0 | missing 0 | rejected notes 1 | sent to customers 0
+backend recorded | owing 22 | accepted 22 | rejected 0 | missing 0 | rejected notes 0 | sent to customers 0
 $ python -I approval.py list out-run
-item 1 | Cobalt Florist (invented) | 2215.35 | over 90 | pending
+item 1 | Cobalt Bakery (invented) | 12295 | over 90 | pending
 $ python -I approval.py approve out-run --item 1 --by "Your Name"
-item 1: approved by Your Name at 2026-11-24T00:41:35Z
+item 1: approved by Your Name at 2026-11-24T01:12:48Z
 $ python -I approval.py reject out-run --item 2 --by "Your Name" --reason "Settle the instalment request first"
-item 2: rejected by Your Name at 2026-11-24T00:41:36Z: Settle the instalment request first
+item 2: rejected by Your Name at 2026-11-24T01:12:48Z: Settle the instalment request first
 $ python -I approval.py export out-run --history out-history.jsonl
 exported items 1 to approved/ | rejected 1 | pending 20 | history lines added 1 | sent to customers 0
 ```
@@ -109,7 +109,7 @@ flowchart LR
 
 | Path | Kind | What was actually run |
 |---|---|---|
-| The model answer the demo replays (`recorded-answer.json`) | Recorded | One real answer from `claude-haiku-5-5` to the request built from the shipped sheet, recorded on 2026-11-24 by a Claude Code subagent given the request text as its whole prompt, and saved as returned. Tests check the sha256 of the request it answers and of the answer file itself. The checks accept all 22 owing customers and set aside one of its notes for a person (see the limits). The first version's real answer to its six-row sheet is kept in `fixtures/`. |
+| The model answer the demo replays (`recorded-answer.json`) | Recorded | One real answer from `claude-haiku-5-5` to the request built from the shipped sheet, recorded on 2026-11-24 by a Claude Code subagent given the request text as its whole prompt, and saved as returned. Tests check the sha256 of the request it answers and of the answer file itself. The checks accept all 22 owing customers. The first version's real answer to its six-row sheet is kept in `fixtures/`. |
 | The live model path (`--backend anthropic`) | Mock | Tested against a local mock of the Messages API on 127.0.0.1, and at its default address with the network call replaced inside the test; never against the real service |
 | The webhook (`--webhook`) | Mock | Tested against a local mock server; no real n8n or Make instance was called |
 | The pipeline, the checks, the run history, the approval, the report, the demo | Local | They run on the reader's computer: `python -I run_tests.py` and `python -I demo.py --out out-demo` |
@@ -134,7 +134,6 @@ The wrong answers and broken sheets in [`gallery/`](gallery/README.md) are const
 ## Limits, stated plainly
 
 - **Synthetic data.** Every customer is an invented business whose name ends in "(invented)", every e-mail address is at example.com, and the identity numbers and phone numbers are placeholders. No real person or business is in any file.
-- **The checks are strict, and they show false alarms.** The recorded answer has the note "Customers 008, 019 and 020 did not answer the phone; the table suggests email instead." In substance it is right: those three customers' notes say so. But only a stand-in written in full, such as `Customer 019`, counts, so the check reads "019" and "020" as figures that are not in the sheet and sets the note aside (the note states a figure that is not in the sheet: 19, 20). That is on purpose: a note the check cannot confirm goes to a person rather than passing as checked.
 - **One recorded model answer is not a measure of reliability.** Another run may order the list differently or make a mistake. The checks catch wrong figures and invented customers. They do not judge whether the order is wise; that stays with a person.
 - **The live API path was tested against a local mock, not against the real service.** The mock answers in the documented shape of the Messages API.
 - **Figures are checked only when they are written in digits.** A number written in words, such as "thirty days", is not checked.

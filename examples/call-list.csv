@@ -1,23 +1,23 @@
 ﻿priority,customer,amount,days_late,bucket,reason
-1,Cobalt Florist (invented),2215.35,173,over 90,"Longest delay in the table at 173 days, with a smaller amount."
-2,Quarry Laundry (invented),13585,98,over 90,"98 days late, and it asked to split the payment into two instalments."
-3,Juniper Tile Works (invented),21655,47,31-60,"47 days late on a large debt, and it says the invoice never arrived, so resend it on the call."
-4,Bramble Framing (invented),13995,75,61-90,"75 days late; it promised to pay by the end of the month, so check that promise."
-5,Lantern Locksmiths (invented),14171.5,64,61-90,64 days late on a large debt; it promised to pay by the end of the month.
-6,Meadow Print Shop (invented),22545.35,22,1-30,"Large debt, 22 days late; it did not answer the phone, so try email."
-7,Pebble Pottery (invented),12910,50,31-60,"50 days late, with no notes."
-8,Maple Locksmiths (invented),20520,16,1-30,16 days late on a large debt; identity was already verified.
-9,Granite Upholstery (invented),25741.55,5,1-30,At most 5 days late; it asked to split the payment into two instalments.
-10,Kestrel Bicycle Repairs (invented),7670,81,61-90,81 days late; identity was already verified.
-11,Riverbend Bicycle Repairs (invented),17025.9,18,1-30,"18 days late; it did not answer the phone, so try email."
-12,Harbour Glass Studio (invented),7770,51,31-60,51 days late; identity was already verified.
-13,Thistle Catering (invented),15760,9,1-30,"9 days late, with no notes."
-14,Sorrel Bookbinding (invented),6685.95,55,31-60,"55 days late; it says the invoice never arrived, so resend it on the call."
-15,Granite Print Shop (invented),14240.35,8,1-30,8 days late; it promised to pay by the end of the month.
-16,Linden Florist (invented),7401.6,36,31-60,36 days late; it asked to split the payment into two instalments.
-17,Maple Bakery (invented),12345,0,current,"Not yet late, with no notes."
-18,Orchard Print Shop (invented),4795,27,1-30,"27 days late, with no notes."
-19,Willow Garden Supplies (invented),2965,45,31-60,"45 days late; it did not answer the phone, so try email."
-20,Cobalt Bakery (invented),12295,123,over 90,"123 days late, but it disputes the invoice, so resolve the dispute before pressing for payment."
-21,Kestrel Florist (invented),34256.4,0,current,"No days late, but it disputes the invoice, so the dispute comes first."
-22,Orchard Bicycle Repairs (invented),330.95,0,current,"No days late, but it says the invoice never arrived, so resend it."
+1,Cobalt Bakery (invented),12295,123,over 90,"123 days late on 12295 owed, and the invoice is disputed, so the dispute needs settling on the call."
+2,Quarry Laundry (invented),13585,98,over 90,"98 days late on 13585 owed, and it has asked to split the payment into two instalments."
+3,Bramble Framing (invented),13995,75,61-90,"75 days late on 13995 owed, and it promised to pay by the end of the month, so check whether that promise holds."
+4,Juniper Tile Works (invented),21655,47,31-60,"47 days late on 21655 owed, and it says the invoice never arrived, so the invoice should be resent first."
+5,Lantern Locksmiths (invented),14171.5,64,61-90,"64 days late on 14171.50 owed, and it promised to pay by the end of the month."
+6,Pebble Pottery (invented),12910,50,31-60,"50 days late on 12910 owed, with no notes on the account."
+7,Kestrel Bicycle Repairs (invented),7670,81,61-90,"81 days late on 7670 owed, and the identity has been verified."
+8,Meadow Print Shop (invented),22545.35,22,1-30,"22 days late on 22545.35 owed, and the phone goes unanswered, so the email should be tried."
+9,Harbour Glass Studio (invented),7770,51,31-60,"51 days late on 7770 owed, and the identity has been verified."
+10,Cobalt Florist (invented),2215.35,173,over 90,"173 days late on 2215.35 owed, the longest delay in the table."
+11,Sorrel Bookbinding (invented),6685.95,55,31-60,"55 days late on 6685.95 owed, and it says the invoice never arrived, so the invoice should be resent first."
+12,Maple Locksmiths (invented),20520,16,1-30,"16 days late on 20520 owed, and the identity has been verified."
+13,Riverbend Bicycle Repairs (invented),17025.9,18,1-30,"18 days late on 17025.90 owed, and the phone goes unanswered, so the email should be tried."
+14,Linden Florist (invented),7401.6,36,31-60,"36 days late on 7401.60 owed, and it has asked to split the payment into two instalments."
+15,Thistle Catering (invented),15760,9,1-30,"9 days late on 15760 owed, with no notes on the account."
+16,Willow Garden Supplies (invented),2965,45,31-60,"45 days late on 2965 owed, and the phone goes unanswered, so the email should be tried."
+17,Orchard Print Shop (invented),4795,27,1-30,"27 days late on 4795 owed, with no notes on the account."
+18,Granite Upholstery (invented),25741.55,5,1-30,"5 days late on 25741.55 owed, and it has asked to split the payment into two instalments."
+19,Granite Print Shop (invented),14240.35,8,1-30,"8 days late on 14240.35 owed, and it promised to pay by the end of the month."
+20,Kestrel Florist (invented),34256.4,0,current,"The largest total owed at 34256.40 but none of it is late, and the invoice is disputed, so the dispute should be settled first."
+21,Maple Bakery (invented),12345,0,current,"12345 owed with 0 days late, so it ranks after the overdue accounts."
+22,Orchard Bicycle Repairs (invented),330.95,0,current,"330.95 owed with 0 days late, and it says the invoice never arrived, so the invoice should be resent first."

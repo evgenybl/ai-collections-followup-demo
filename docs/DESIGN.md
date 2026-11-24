@@ -60,15 +60,6 @@ carry a figure nobody checked, so a decision, an export and the report all refus
 its sha256. To change a draft, change the input and run again. This guards against accidents, not against someone who
 also edits `run-report.json`.
 
-**A strict check shows a person what it cannot confirm, false alarms included.** The recorded answer shows it. One of
-its notes for a person reads "Customers 008, 019 and 020 did not answer the phone; the table suggests email
-instead." In substance it is right: those three customers' notes say the phone was not answered. But only a stand-in
-written in full, such as `Customer 019`, counts as one, so "019" and "020" are read as figures, and the sheet has no
-such figures: the note is set aside (the note states a figure that is not in the sheet: 19, 20) and listed for a
-person instead of passing as checked. Recognising "Customers 008, 019 and 020" as three stand-ins would make this note
-pass, and would also teach the check to guess at what a text means. It stays strict: a note it cannot confirm goes to a
-person, and a test keeps this result as it is.
-
 **The gallery is constructed.** A model cannot be made to fail on cue, and a real failure would not come back the same
 way twice. Each wrong answer is the recorded answer with one documented change, written again by `make_examples.py`
 whenever the recording changes, and each case is judged against what the recorded answer itself gives. So the gallery
