@@ -2,12 +2,14 @@
 Run: python -I test_report.py  (every test file: python -I run_tests.py)"""
 import csv
 import datetime
+import io
 import json
 import pathlib
 import re
 import sys
 import unittest
 from decimal import Decimal
+from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -130,16 +132,46 @@ class ReportTest(TempTest):
         self.assertIn(f"{name[changed]}<span class=\"changed\">amount changed since the last draft</span>", text)
         self.assertIn(f"<li>{name[changed]}: ", text)
 
-    def test_the_label_says_live_only_for_the_anthropic_backend(self):
+    def test_the_label_says_live_only_for_the_default_api_address(self):
         prep = pipeline.prepare(SHEET, PROMPT)
-        server = MockServer(json.dumps(constructed_answer(prep)))
+        answer = json.dumps(constructed_answer(prep))
+        # 1. A mock on this computer: the live path, but not live.
+        server = MockServer(answer)
         try:
             with api_key("unit" + "-" + "test" + "-" + "placeholder"):
-                pipeline.run(SHEET, PROMPT, pipeline.AnthropicBackend(api_base=server.url), self.base / "live")
+                pipeline.run(SHEET, PROMPT, pipeline.AnthropicBackend(api_base=server.url), self.base / "mock")
         finally:
             server.close()
-        self.assertIn('<span class="tag">Live</span>', self.page(self.base / "live", "live.html"))
-        self.assertIn('<span class="tag">Recorded</span>', self.page(self.run_pipeline(constructed_answer(prep))))
+        host = f"127.0.0.1:{server.httpd.server_address[1]}"
+        data = json.loads((self.base / "mock" / "run-report.json").read_text(encoding="utf-8"))
+        self.assertEqual((data["api_host"], data["api_default_address"]), (host, False))
+        text = self.page(self.base / "mock", "mock.html")
+        self.assertIn(f'<span class="tag">Live path, custom endpoint {host}</span>', text)
+        self.assertNotIn('<span class="tag">Live</span>', text)
+        # 2. The default address. urlopen is replaced in this process, so the request goes nowhere.
+        seen = []
+
+        class Reply(io.BytesIO):
+            def __enter__(self):
+                return self
+
+        def fake_urlopen(request, timeout):
+            seen.append(request.full_url)
+            return Reply(json.dumps({"type": "message", "content": [{"type": "text", "text": answer}],
+                                     "stop_reason": "end_turn"}).encode("utf-8"))
+
+        with mock.patch.object(pipeline.urllib.request, "urlopen", fake_urlopen):
+            with api_key("unit" + "-" + "test" + "-" + "placeholder"):
+                pipeline.run(SHEET, PROMPT, pipeline.AnthropicBackend(), self.base / "default")
+        self.assertEqual(seen, [pipeline.DEFAULT_API_BASE + "/v1/messages"])
+        data = json.loads((self.base / "default" / "run-report.json").read_text(encoding="utf-8"))
+        self.assertEqual((data["api_host"], data["api_default_address"]), ("api.anthropic.com", True))
+        self.assertIn('<span class="tag">Live</span>', self.page(self.base / "default", "default.html"))
+        # 3. The recorded answer.
+        run = self.run_pipeline(constructed_answer(prep))
+        data = json.loads((run / "run-report.json").read_text(encoding="utf-8"))
+        self.assertEqual((data["api_host"], data["api_default_address"]), (None, None))
+        self.assertIn('<span class="tag">Recorded</span>', self.page(run))
         owing = [who for who, c in prep["expected"].items() if c["total"] > 0]
         history = self.write("all.jsonl", "".join(json.dumps({
             "customer_key": prep["customer_keys"][who], "exported_on": AS_OF,

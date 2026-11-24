@@ -160,7 +160,7 @@ Tests of the report page: its parts and their order, its figures from the run's 
 - every figure comes from the run files
 - refusals the history and a changed amount are shown
 - text from the model or the sheet is shown as text
-- the label says live only for the anthropic backend
+- the label says live only for the default api address
 - the page has its nine parts in order
 - the page is self contained
 - the page shows the decisions when it is written again

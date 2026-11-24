@@ -582,6 +582,14 @@ def ageing(expected):
     return out
 
 
+def api_host(api_base):
+    """The host (and port) an API address points at, without its scheme, path or anything else."""
+    parts = urllib.parse.urlparse(api_base)
+    host = parts.hostname or ""
+    host = f"[{host}]" if ":" in host else host
+    return host + (f":{parts.port}" if parts.port else "")
+
+
 def write_text(path, text):
     """Write UTF-8 with LF line ends on every system, so that a file's sha256 does not depend on the system that
     wrote it, and return that sha256."""
@@ -652,9 +660,13 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
                            for who, r in sorted(changed.items())],
     })
     owing = {who: c for who, c in prep["everyone"].items() if c["total"] > 0}
+    api_base = getattr(backend, "api_base", None)
     report = {
         "backend": backend.name,
         "model": backend.model,
+        # Where the API requests went, so that a run against a mock or another endpoint is never shown as live.
+        "api_host": api_host(api_base) if api_base else None,
+        "api_default_address": api_base == DEFAULT_API_BASE if api_base else None,
         "request_sha256": hashlib.sha256(prep["request"].encode("utf-8")).hexdigest(),
         "personal_values_in_request": len(prep["leaked"]),
         "customers_owing": len(owing),

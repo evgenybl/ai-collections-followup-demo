@@ -23,8 +23,6 @@ import approval  # noqa: E402
 import pipeline  # noqa: E402
 from pipeline import PipelineError  # noqa: E402
 
-BACKEND_LABEL = {"recorded": "Recorded", "anthropic": "Live"}
-
 STYLE = """
 :root { --ink: #1f2933; --muted: #52606d; --line: #d9e2ec; --soft: #f5f7fa; --bar: #486581; --bar-edge: #243b53;
   --approved: #1f6f43; --rejected: #9b2c2c; --pending: #7a5b00; }
@@ -90,6 +88,18 @@ def shown(text):
     return pipeline.money(value)
 
 
+def backend_label(report):
+    """What answered, from the run report's facts: Recorded for a recorded answer; Live only for the Anthropic backend
+    at its default address; for any other address, "Live path, custom endpoint" and the host it went to."""
+    if report["backend"] == "recorded":
+        return "Recorded"
+    if report["backend"] == "anthropic":
+        if report.get("api_default_address"):
+            return "Live"
+        return f"Live path, custom endpoint {report.get('api_host') or 'not recorded'}"
+    return report["backend"]
+
+
 def state_html(entry):
     if entry is None:
         return '<span class="state pending">Waiting for a decision</span>'
@@ -126,7 +136,7 @@ def load(folder):
 def page(report, states, person, rows, reminders):
     drafts = sorted(report["drafts"], key=lambda d: d["item"])
     total_owed = Decimal(report["total_owed"])
-    label = BACKEND_LABEL.get(report["backend"], report["backend"])
+    label = backend_label(report)
     if not report["model_called"]:
         label += ": the model was not called, every owing customer was already drafted"
     out = ["<!doctype html>", '<html lang="en">', "<head>", '<meta charset="utf-8">',

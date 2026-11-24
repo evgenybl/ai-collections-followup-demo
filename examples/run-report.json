@@ -1,6 +1,8 @@
 {
  "backend": "recorded",
  "model": "recorded:recorded-answer.json",
+ "api_host": null,
+ "api_default_address": null,
  "request_sha256": "b78d46470f5f6128ab7d8882133153a8f2133309e7f65e7f0f114ce674730a49",
  "personal_values_in_request": 0,
  "customers_owing": 22,
