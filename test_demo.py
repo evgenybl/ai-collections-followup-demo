@@ -41,11 +41,24 @@ class DemoTest(TempTest):
         code, printed, _ = call_main(demo, ["--out", str(self.base), "--as-of", make_examples.AS_OF])
         lines = printed.splitlines()
         self.assertEqual(code, 0, printed)
-        self.assertEqual([line.split(" | ")[0] for line in lines[:-1]], CASE_NAMES)
-        self.assertTrue(all(line.endswith(" | PASS") for line in lines[:-1]), printed)
-        self.assertEqual(lines[-1], f"10 of 10 case(s) ended as expected | written under "
-                                    f"{(self.base / 'demo-001').as_posix()}")
+        self.assertEqual(len(lines), 22)  # ten detailed lines, a blank line, the closing table, the total
+        detailed, blank, table, total = lines[:10], lines[10], lines[11:21], lines[21]
+        self.assertEqual([line.split(" | ")[0] for line in detailed], CASE_NAMES)
+        self.assertTrue(all(line.endswith(" | PASS") for line in detailed), printed)
+        self.assertEqual(blank, "")
+        self.assertEqual([line.split()[0] for line in table], CASE_NAMES)
+        self.assertTrue(all(line.endswith("  PASS") and len(line) <= demo.COMPACT_WIDTH for line in table), table)
+        self.assertEqual(len({line.rindex("PASS") for line in table}), 1, "the verdicts line up")
+        self.assertEqual(total, f"10 of 10 case(s) ended as expected | written under "
+                                f"{(self.base / 'demo-001').as_posix()}")
         self.assertTrue((self.base / "demo-001" / "happy-path" / "report.html").is_file())
+
+    def test_the_closing_table_cuts_a_long_text_but_never_the_verdict(self):
+        rows = [("short-case", "a few words", True), ("long-case", "word " * 40, False)]
+        lines = demo.closing_table(rows)
+        self.assertTrue(all(len(line) <= demo.COMPACT_WIDTH for line in lines))
+        self.assertTrue(lines[0].startswith("short-case  a few words ") and lines[0].endswith("  PASS"))
+        self.assertTrue(lines[1].endswith("...  FAIL"), lines[1])
 
     def test_one_case_runs_alone_in_a_new_folder_each_time(self):
         for number in (1, 2):
@@ -63,9 +76,11 @@ class DemoTest(TempTest):
         with mock.patch.object(demo, "GALLERY", fake):
             code, printed, _ = call_main(demo, ["--case", "wrong-total", "--out", str(self.base / "out")])
         self.assertEqual(code, 1)
-        self.assertIn("| happened: exit 0; rejected no new rejection;", printed)
-        self.assertTrue(printed.splitlines()[0].endswith(" | FAIL"))
-        self.assertTrue(printed.splitlines()[1].startswith("0 of 1 case(s) ended as expected"))
+        lines = printed.splitlines()
+        self.assertIn("| happened: exit 0; rejected no new rejection;", lines[0])
+        self.assertTrue(lines[0].endswith(" | FAIL"))
+        self.assertTrue(lines[2].startswith("wrong-total  exit 0, nothing new set aside,") and lines[2].endswith("FAIL"))
+        self.assertTrue(lines[3].startswith("0 of 1 case(s) ended as expected"))
 
     def test_usage_is_refused(self):
         for argv, message in [([], "--out is required, except with --list"),

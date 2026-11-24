@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-112 tests in 6 files.
+113 tests in 6 files.
 
 ## test_approval.py
 
@@ -35,6 +35,7 @@ Tests of the failure gallery (demo.py and gallery/), the examples and the list o
 - every case ends as expected
 - one case runs alone in a new folder each time
 - the api case puts the environment back
+- the closing table cuts a long text but never the verdict
 - the list names the ten cases
 - usage is refused
 

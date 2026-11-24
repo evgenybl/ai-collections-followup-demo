@@ -1,5 +1,5 @@
 """The failure gallery: each named case runs the real command lines, then prints what was expected, what happened, and
-PASS or FAIL.
+PASS or FAIL. After those lines comes a closing table, one short line per case, and the total.
 
   python -I demo.py --out <folder>                  every case, in a new folder demo-NNN under <folder>
   python -I demo.py --case <name> --out <folder>    one case
@@ -37,6 +37,7 @@ SHEET = HERE / "customers.synthetic.csv"
 PROMPT = HERE / "prompt.txt"
 RECORDED = HERE / "recorded-answer.json"
 GALLERY = HERE / "gallery"
+COMPACT_WIDTH = 100  # the longest line of the closing table
 BY = "Reviewer One (invented)"
 REJECT_REASON = "Hold until the note for a person about this customer is dealt with"
 
@@ -105,6 +106,11 @@ def one_more_rejection(data, before, words):
     return found if same and len(data["rejected"]) == len(before) + 1 else []
 
 
+def stopped(happened):
+    """A case that could not get to its point: FAIL, with what happened; its short line points to the long one."""
+    return False, happened, "stopped early; its detailed line above says why"
+
+
 def flagged(data):
     """The drafts' items whose customer a note for a person names, and the others, each in priority order."""
     def named(who):
@@ -119,39 +125,42 @@ def happy_path(folder, settings):
     run, history = folder / "run", folder / "history.jsonl"
     code, _, err = pipeline_run(run, settings)
     if code != 0:
-        return False, f"the pipeline ended with exit {code}: {first_line(err)}"
+        return stopped(f"the pipeline ended with exit {code}: {first_line(err)}")
     data = run_report(run)
     noted, clear = flagged(data)
     if len(clear) < 2 or not noted:
-        return False, (f"the run has {len(clear)} draft(s) without a note and {len(noted)} with one; this case needs "
+        return stopped(f"the run has {len(clear)} draft(s) without a note and {len(noted)} with one; this case needs "
                        "two and one")
     approve, reject = clear[:2], noted[0]
     for item, reason in [(approve[0], None), (approve[1], None), (reject, REJECT_REASON)]:
         code, _, err = decide(run, settings, item, reason)
         if code != 0:
-            return False, f"a decision on item {item} was refused: {first_line(err)}"
+            return stopped(f"a decision on item {item} was refused: {first_line(err)}")
     code, _, err = invoke(approval, ["export", run, "--history", history, "--as-of", settings.as_of])
     if code != 0:
-        return False, f"the export ended with exit {code}: {first_line(err)}"
+        return stopped(f"the export ended with exit {code}: {first_line(err)}")
     code, _, err = invoke(report, [run, "--out", folder / "report.html"])
     if code != 0:
-        return False, f"the report ended with exit {code}: {first_line(err)}"
+        return stopped(f"the report ended with exit {code}: {first_line(err)}")
     exported = sorted(p.name for p in (run / "approved" / "reminders").iterdir())
     with (run / "approved" / "call-list.csv").open(encoding="utf-8-sig", newline="") as f:
         lines = [int(row[0]) for row in list(csv.reader(f))[1:]]
     history_lines = len(history.read_text(encoding="utf-8").splitlines())
     ok = (exported == [f"reminder-{i:02d}.txt" for i in approve] and lines == approve and history_lines == 2)
-    return ok, (f"exit 0; {len(data['drafts'])} drafts; items {approve[0]} and {approve[1]} approved, item {reject} "
+    happened = (f"exit 0; {len(data['drafts'])} drafts; items {approve[0]} and {approve[1]} approved, item {reject} "
                 f"rejected (a note names it), {len(data['drafts']) - 3} pending; the export holds reminders "
                 f"{', '.join(exported)} and call-list lines {', '.join(str(i) for i in lines)}; history lines "
                 f"{history_lines}; report written")
+    return ok, happened, f"exit 0, approved {len(approve)}, held 1 back with a reason, exported {len(exported)}"
 
 
 def bad_sheet(folder, settings):
     run = folder / "run"
     code, _, err = pipeline_run(run, settings, sheet=GALLERY / "bad-sheet.csv")
-    ok = code == 2 and not run.exists() and "amount_due '4,200'" in err
-    return ok, f"exit {code}; {written(run)}; {first_line(err)}"
+    caught = "amount_due '4,200'" in err
+    ok = code == 2 and not run.exists() and caught
+    return (ok, f"exit {code}; {written(run)}; {first_line(err)}",
+            f"exit {code}, 4,200 {'caught' if caught else 'not caught'} by the sheet check, {written(run)}")
 
 
 def wrong_total(folder, settings):
@@ -159,12 +168,14 @@ def wrong_total(folder, settings):
     accepted, rejected = baseline()
     code, _, err = pipeline_run(run, settings, answer=GALLERY / "wrong-total.json")
     if code != 0:
-        return False, f"exit {code}: {first_line(err)}"
+        return stopped(f"exit {code}: {first_line(err)}")
     data = run_report(run)
     new = one_more_rejection(data, rejected, "does not match the sheet's total")
     ok = bool(new) and data["accepted"] == accepted - 1
     shown = f"{new[-1]['customer']} ({new[-1]['reason']})" if new else "no new rejection"
-    return ok, f"exit 0; rejected {shown}; the other {data['accepted']} items kept"
+    what = "the wrong total set aside" if new else "nothing new set aside"
+    return (ok, f"exit 0; rejected {shown}; the other {data['accepted']} items kept",
+            f"exit 0, {what}, {data['accepted']} others kept")
 
 
 def invented_customer(folder, settings):
@@ -172,54 +183,61 @@ def invented_customer(folder, settings):
     accepted, rejected = baseline()
     code, _, err = pipeline_run(run, settings, answer=GALLERY / "invented-customer.json")
     if code != 0:
-        return False, f"exit {code}: {first_line(err)}"
+        return stopped(f"exit {code}: {first_line(err)}")
     data = run_report(run)
     new = one_more_rejection(data, rejected, "this customer is not in the sheet")
     ok = bool(new) and data["accepted"] == accepted
     shown = f"{new[-1]['customer']} ({new[-1]['reason']})" if new else "no new rejection"
-    return ok, f"exit 0; rejected {shown}; the other {data['accepted']} items kept"
+    what = f"{new[-1]['customer']} set aside" if new else "nothing new set aside"
+    return (ok, f"exit 0; rejected {shown}; the other {data['accepted']} items kept",
+            f"exit 0, {what}, {data['accepted']} others kept")
 
 
 def leak_guard(folder, settings):
     run = folder / "run"
     code, _, err = pipeline_run(run, settings, sheet=GALLERY / "leak-sheet.csv")
-    ok = code == 2 and not run.exists() and "would reach the model; nothing was sent" in err
-    return ok, f"exit {code}; {written(run)}; {first_line(err)}"
+    caught = "would reach the model; nothing was sent" in err
+    ok = code == 2 and not run.exists() and caught
+    what = "a personal value caught before sending" if caught else "no personal value caught"
+    return ok, f"exit {code}; {written(run)}; {first_line(err)}", f"exit {code}, {what}, {written(run)}"
 
 
 def second_run(folder, settings):
     first, second, history = folder / "first", folder / "second", folder / "history.jsonl"
     code, _, err = pipeline_run(first, settings)
     if code != 0:
-        return False, f"the first run ended with exit {code}: {first_line(err)}"
+        return stopped(f"the first run ended with exit {code}: {first_line(err)}")
     for item in sorted(d["item"] for d in run_report(first)["drafts"]):
         code, _, err = decide(first, settings, item)
         if code != 0:
-            return False, f"a decision on item {item} was refused: {first_line(err)}"
+            return stopped(f"a decision on item {item} was refused: {first_line(err)}")
     code, _, err = invoke(approval, ["export", first, "--history", history, "--as-of", settings.as_of])
     if code != 0:
-        return False, f"the export ended with exit {code}: {first_line(err)}"
+        return stopped(f"the export ended with exit {code}: {first_line(err)}")
     code, _, err = pipeline_run(second, settings, "--history", history)
     if code != 0:
-        return False, f"the second run ended with exit {code}: {first_line(err)}"
+        return stopped(f"the second run ended with exit {code}: {first_line(err)}")
     data = run_report(second)
     ok = (not data["model_called"] and len(data["already_drafted"]) == data["customers_owing"]
           and data["drafts"] == [])
-    return ok, (f"exit 0; the second run found {len(data['already_drafted'])} of {data['customers_owing']} owing "
-                f"customers already drafted; model called: {'yes' if data['model_called'] else 'no'}; "
-                f"drafts written: {len(data['drafts'])}")
+    drafted, owing = len(data["already_drafted"]), data["customers_owing"]
+    called = "called" if data["model_called"] else "not called"
+    happened = (f"exit 0; the second run found {drafted} of {owing} owing customers already drafted; model called: "
+                f"{'yes' if data['model_called'] else 'no'}; drafts written: {len(data['drafts'])}")
+    return ok, happened, f"exit 0, {drafted} of {owing} already drafted, model {called}"
 
 
 def no_approval(folder, settings):
     run, history = folder / "run", folder / "history.jsonl"
     code, _, err = pipeline_run(run, settings)
     if code != 0:
-        return False, f"the pipeline ended with exit {code}: {first_line(err)}"
+        return stopped(f"the pipeline ended with exit {code}: {first_line(err)}")
     code, printed, err = invoke(approval, ["export", run, "--history", history, "--as-of", settings.as_of])
     exported = (run / "approved").exists() or history.exists()
     ok = code == 0 and not exported and printed.startswith("nothing approved: nothing exported")
-    return ok, (f"exit {code}; {first_line(printed or err).split(' | ')[0]}; approved/ or history written: "
+    happened = (f"exit {code}; {first_line(printed or err).split(' | ')[0]}; approved/ or history written: "
                 f"{'yes' if exported else 'no'}")
+    return ok, happened, f"exit {code}, no decision recorded, {'something' if exported else 'nothing'} exported"
 
 
 def foreign_decisions(folder, settings):
@@ -227,15 +245,18 @@ def foreign_decisions(folder, settings):
     for run, answer in [(first, RECORDED), (second, GALLERY / "wrong-total.json")]:
         code, _, err = pipeline_run(run, settings, answer=answer)
         if code != 0:
-            return False, f"a run ended with exit {code}: {first_line(err)}"
+            return stopped(f"a run ended with exit {code}: {first_line(err)}")
     code, _, err = decide(first, settings, 1)
     if code != 0:
-        return False, f"the decision was refused: {first_line(err)}"
+        return stopped(f"the decision was refused: {first_line(err)}")
     shutil.copyfile(first / approval.DECISIONS, second / approval.DECISIONS)
     code, _, err = invoke(approval, ["export", second, "--as-of", settings.as_of])
     exported = (second / "approved").exists()
-    ok = code == 2 and not exported and "names another run" in err
-    return ok, f"exit {code}; approved/ written: {'yes' if exported else 'no'}; {first_line(err)}"
+    caught = "names another run" in err
+    ok = code == 2 and not exported and caught
+    return (ok, f"exit {code}; approved/ written: {'yes' if exported else 'no'}; {first_line(err)}",
+            f"exit {code}, another run's decisions {'caught' if caught else 'not caught'}, "
+            f"{'something' if exported else 'nothing'} exported")
 
 
 class Answers500(http.server.BaseHTTPRequestHandler):
@@ -280,8 +301,10 @@ def api_error(folder, settings):
     finally:
         server.shutdown()
         server.server_close()
-    ok = code == 3 and not run.exists() and "HTTP status 500" in err
-    return ok, f"exit {code}; {written(run)}; {first_line(err)}"
+    caught = "HTTP status 500" in err
+    ok = code == 3 and not run.exists() and caught
+    return (ok, f"exit {code}; {written(run)}; {first_line(err)}",
+            f"exit {code}, the mock's HTTP 500 {'caught' if caught else 'not caught'}, {written(run)}")
 
 
 def webhook_down(folder, settings):
@@ -292,8 +315,11 @@ def webhook_down(folder, settings):
     code, printed, err = pipeline_run(run, settings, "--webhook", f"http://127.0.0.1:{port}/webhook")
     kept = all((run / name).is_file() for name in ("call-list.csv", "for-a-person.txt", "run-report.json"))
     status = run_report(run).get("webhook_status") if kept else None
-    ok = code == 4 and kept and str(status).startswith("failed")
-    return ok, f"exit {code}; outputs kept: {'yes' if kept else 'no'}; webhook {'failed' if ok else status}"
+    unreachable = str(status).startswith("failed")
+    ok = code == 4 and kept and unreachable
+    return (ok, f"exit {code}; outputs kept: {'yes' if kept else 'no'}; webhook {'failed' if ok else status}",
+            f"exit {code}, webhook {'unreachable' if unreachable else 'reached'}, outputs "
+            f"{'kept' if kept else 'not kept'}")
 
 
 CASES = [
@@ -312,6 +338,17 @@ CASES = [
      api_error),
     ("webhook-down", "The webhook is unreachable", "outputs kept, exit 4", webhook_down),
 ]
+
+
+def closing_table(rows):
+    """One short line per case: its name, a few words of what happened, PASS or FAIL, in aligned columns and at most
+    COMPACT_WIDTH characters; a longer text is cut and ends in "...", so the verdict is never cut."""
+    name_width = max(len(name) for name, _, _ in rows) + 2
+    room = COMPACT_WIDTH - name_width - len("  PASS")
+    shorts = [short if len(short) <= room else short[:room - 3] + "..." for _, short, _ in rows]
+    width = max(len(short) for short in shorts)
+    return [f"{name:<{name_width}}{short:<{width}}  {'PASS' if ok else 'FAIL'}"
+            for (name, _, ok), short in zip(rows, shorts)]
 
 
 def new_folder(base):
@@ -350,16 +387,19 @@ def main(argv=None):
     settings = Settings((args.as_of or datetime.date.today()).isoformat(), at)
     folder = new_folder(pathlib.Path(args.out))
     cases = [case for case in CASES if args.case in (None, case[0])]
-    passed = 0
+    table = []
     for name, _, expected, run_case in cases:
         case_folder = folder / name
         case_folder.mkdir()
         try:
-            ok, happened = run_case(case_folder, settings)
+            ok, happened, short = run_case(case_folder, settings)
         except Exception as exc:  # a case that breaks is reported as a FAIL with its reason, and the others still run
-            ok, happened = False, f"the case stopped: {type(exc).__name__}: {exc}"
-        passed += ok
+            ok, happened, short = False, f"the case stopped: {type(exc).__name__}: {exc}", f"stopped: {exc}"
         print(f"{name} | expected: {expected} | happened: {happened} | {'PASS' if ok else 'FAIL'}")
+        table.append((name, short, ok))
+    print()
+    print("\n".join(closing_table(table)))
+    passed = sum(ok for _, _, ok in table)
     print(f"{passed} of {len(cases)} case(s) ended as expected | written under {folder.as_posix()}")
     return 0 if passed == len(cases) else 1
 
