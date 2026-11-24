@@ -2,11 +2,15 @@
 hold, the sheet check's limits, the leak guard's whole words, and the amounts kept exact after the scrub.
 Run: python -I test_checks.py  (every test file: python -I run_tests.py)"""
 import csv
+import http.server
 import json
+import os
 import pathlib
 import sys
+import threading
 import unittest
 from decimal import Decimal
+from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -14,7 +18,8 @@ import approval  # noqa: E402
 import make_sheet  # noqa: E402
 import pipeline  # noqa: E402
 import pseudonymise  # noqa: E402
-from testsupport import PROMPT, SHEET, SpyBackend, TempTest, call_main, constructed_answer  # noqa: E402
+from testsupport import (PROMPT, SHEET, MockServer, SpyBackend, TempTest, call_main,  # noqa: E402
+                         closed_port_url, constructed_answer)
 
 
 class TextCheckTest(unittest.TestCase):
@@ -173,6 +178,56 @@ class FormulaCellTest(TempTest):
         row = dict(zip(make_sheet.COLUMNS, ["+Plus Shop (invented)", "000000001", "000-000-0001",
                                             "plus@example.com", "1 Example Street Example City", "5", "1", ""]))
         self.assertIn("\n'+Plus Shop (invented),000000001,", make_sheet.sheet_text([row]))
+
+
+class Redirect(http.server.BaseHTTPRequestHandler):
+    """Answers every POST with a redirect to the address set on the server."""
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("content-length", 0)))
+        self.send_response(302)
+        self.send_header("location", self.server.target)
+        self.send_header("content-length", "0")
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+class WebhookTest(TempTest):
+    """The webhook reaches the address it was given, and nothing else."""
+
+    def run_with_webhook(self, url, name):
+        answer = self.answer_file(constructed_answer(pipeline.prepare(SHEET, PROMPT)))
+        return call_main(pipeline, ["--recorded", str(answer), "--out", str(self.base / name), "--webhook", url])
+
+    def test_a_redirect_is_a_failure_and_is_not_followed(self):
+        final = MockServer("")
+        start = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Redirect)
+        start.target = final.url + "/elsewhere"
+        threading.Thread(target=start.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+        try:
+            code, printed, _ = self.run_with_webhook(f"http://127.0.0.1:{start.server_address[1]}/hook", "r")
+        finally:
+            start.shutdown()
+            start.server_close()
+            final.close()
+        self.assertEqual(code, 4)
+        self.assertIn("| webhook failed: HTTP 302", printed)
+        self.assertEqual(final.httpd.seen, [])
+
+    def test_a_proxy_in_the_environment_is_not_used(self):
+        server = MockServer("")
+        proxy = closed_port_url()  # were the proxy used, the request would fail here
+        try:
+            with mock.patch.dict(os.environ, {"HTTP_PROXY": proxy, "http_proxy": proxy, "NO_PROXY": "",
+                                              "no_proxy": ""}):
+                code, printed, _ = self.run_with_webhook(server.url + "/hook", "p")
+        finally:
+            server.close()
+        self.assertEqual(code, 0, printed)
+        self.assertIn("| webhook 200", printed)
+        self.assertEqual(len(server.httpd.seen), 1)
 
 
 if __name__ == "__main__":

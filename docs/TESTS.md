@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-136 tests in 7 files.
+138 tests in 7 files.
 
 ## test_approval.py
 
@@ -56,6 +56,13 @@ Every checked text: the note for a person, the reason and the reminder.
 - a loose reference to stand ins is set aside in a note
 - a numeral other than 0 to 9 is refused everywhere
 - a reminder may not hold a per cent sign or a web address
+
+### WebhookTest
+
+The webhook reaches the address it was given, and nothing else.
+
+- a proxy in the environment is not used
+- a redirect is a failure and is not followed
 
 ## test_demo.py
 

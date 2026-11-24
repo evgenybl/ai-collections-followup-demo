@@ -627,12 +627,24 @@ def check_webhook(url, allow_remote):
                             "with the approval of the owner of the data", 2)
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect is not followed; the answer that asked for it is a failure (HTTP 3xx)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+# The webhook's rule, "this computer only", is checked on the address it is given. So the request goes to that address
+# and nowhere else: through no proxy from the environment, and without following a redirect.
+WEBHOOK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+
 def post_webhook(url, payload, allow_remote=False, timeout=15):
     """POST the payload and return the HTTP status. A failure raises OSError or http.client.HTTPException."""
     check_webhook(url, allow_remote)
     req = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), method="POST",
                                  headers={"content-type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with WEBHOOK_OPENER.open(req, timeout=timeout) as resp:
         return resp.status
 
 
