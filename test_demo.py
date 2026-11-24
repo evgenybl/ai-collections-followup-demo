@@ -3,6 +3,7 @@ writes, and the output the README quotes.
 Run: python -I test_demo.py  (every test file: python -I run_tests.py)"""
 import csv
 import hashlib
+import inspect
 import json
 import os
 import pathlib
@@ -133,6 +134,13 @@ class GalleryTest(unittest.TestCase):
             self.assertEqual(dict(rows[0], **{column: shipped[0][column]}), shipped[0], name)
             expected = value.format(*shipped[0]["name"].split(" ", 1)) if "{}" in value else value
             self.assertEqual(rows[0][column], expected, name)
+
+    def test_the_gallery_readme_counts_the_cases_that_read_it(self):
+        reading = [name for name, _, _, case in demo.CASES if "GALLERY" in inspect.getsource(case)]
+        self.assertEqual(reading, ["bad-sheet", "wrong-total", "invented-customer", "leak-guard", "foreign-decisions"])
+        readme = " ".join((GALLERY / "README.md").read_text(encoding="utf-8").split())
+        self.assertIn("Five of them read the files in this folder: " + ", ".join(f"`{n}`" for n in reading[:-1])
+                      + f" and `{reading[-1]}`.", readme)
 
     def test_the_gallery_readme_names_every_file_and_case(self):
         readme = (GALLERY / "README.md").read_text(encoding="utf-8")

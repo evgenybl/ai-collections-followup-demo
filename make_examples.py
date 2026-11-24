@@ -111,12 +111,11 @@ def what_the_checks_did(report):
     if report["rejected_notes"]:
         lines += ["", "The note(s) set aside, as the run report keeps them (with stand-ins), and the reason:", ""]
         lines += [f"- \"{r['note']}\" ({r['reason']})" for r in report["rejected_notes"]]
-        lines += ["", "A note may state only figures that are in the sheet, and a stand-in counts only when it is "
-                      "written in full, such as `Customer 019`. Written any other way, its number reads as a figure "
-                      "the check cannot confirm, and the note goes to a person as set aside instead of passing as "
-                      "checked. The check is strict on purpose: it would rather show a person a note it cannot "
-                      "confirm, even one that is right in substance, as the sheet's own notes on the phone show this "
-                      "one to be."]
+    if any("loose reference" in r["reason"] for r in report["rejected_notes"]):
+        lines += ["", "A stand-in counts only when it is written in full, such as `Customer 005`. A number with a "
+                      "leading zero outside one, such as 005 in \"Customers 005, 007\", is a loose reference: the "
+                      "figure check cannot tell what it means, and the note could pass only by chance, so it goes to "
+                      "a person as set aside instead of passing as checked."]
     return lines
 
 
@@ -131,8 +130,11 @@ def examples_readme(run, reminders, demo_line):
         "CI writes it again and fails if git then shows a difference.", "",
         f"It is the real output of `python -I demo.py --case happy-path --as-of {AS_OF} --at {AT}` on the shipped "
         f"sheet (`make_sheet.py`, seed {make_sheet.DEFAULT_SEED}, {make_sheet.DEFAULT_CUSTOMERS} customers) with "
-        f"`recorded-answer.json`: one real answer from `{meta['model']}`, recorded on {meta['recorded_on']} "
-        f"({meta['route']}).", ""] + what_the_checks_did(report) + ["",
+        f"`recorded-answer.json`. By the author's statement, that file is an answer from `{meta['model']}`, recorded "
+        f"on {meta['recorded_on']} ({meta['route']}). Such a subagent runs under its own system prompt, so it is not "
+        "the same call as `--backend anthropic`. The repository cannot prove the origin: the sha256 in the meta file "
+        "proves only that the file has not changed since it was saved and that it answers the request built today.",
+        ""] + what_the_checks_did(report) + ["",
         "The demo printed:", "", "```", demo_line, "```", "",
         "| File | What it is |", "|---|---|",
         "| `call-list.csv` | The call list the run drafted, in priority order, with the (invented) names and each "

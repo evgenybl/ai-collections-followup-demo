@@ -1,7 +1,8 @@
 # The failure gallery
 
-`demo.py` runs ten named cases and prints, for each one, what was expected, what happened, and PASS or FAIL. Four of
-them read the files in this folder.
+`demo.py` runs ten named cases and prints, for each one, what was expected, what happened, and PASS or FAIL. Five of
+them read the files in this folder: `bad-sheet`, `wrong-total`, `invented-customer`, `leak-guard` and
+`foreign-decisions`.
 
 **Every file here is constructed, never recorded.** Each is the recorded model answer (`recorded-answer.json`) or the
 shipped sheet (`customers.synthetic.csv`) with exactly one thing changed, as the table says. `python -I
@@ -32,13 +33,18 @@ run. `python -I demo.py --list` lists them.
 | `api-error` | The live path against a mock on 127.0.0.1 that answers 500 | refused, exit 3, nothing written | `python -I demo.py --case api-error --out out-demo` |
 | `webhook-down` | The webhook is a closed port on 127.0.0.1 | outputs kept, exit 4 | `python -I demo.py --case webhook-down --out out-demo` |
 
-The four cases that read this folder are also one pipeline command each, for example
+Four of the five cases that read this folder are also one pipeline command each, for example
 `python -I pipeline.py --recorded gallery/wrong-total.json --out out-wrong-total` or
 `python -I pipeline.py --sheet gallery/bad-sheet.csv --out out-bad-sheet`.
 
 ## How a case is judged
 
-- On the shipped sheet the checks accept all 22 owing customers of the recorded answer and reject nothing.
+- The recorded answer is, by the author's statement, a model's answer, obtained by giving a Claude Code subagent the
+  request text as its whole prompt. The repository cannot prove that; its sha256 proves only that the file has not
+  changed since it was saved and that it answers the request built today. On the shipped sheet the checks accept all
+  22 owing customers of it, reject nothing, and set aside one note for a person: "Customers 005, 007 and 016 promised
+  to pay by the end of the month; check whether the promise is kept." (the note holds a loose reference to a
+  stand-in: 005, 007, 016).
 - `wrong-total` and `invented-customer` are judged against what the recorded answer itself gives on the sheet: exactly
   one more rejection, of the right kind, and every other item kept as before.
 - `second-run` approves and exports every draft of the first run, then runs again inside the window. The recorded

@@ -2,7 +2,7 @@
 
 Everything in this folder is written by `python -I make_examples.py`, and nothing in it is edited by hand: CI writes it again and fails if git then shows a difference.
 
-It is the real output of `python -I demo.py --case happy-path --as-of 2026-11-24 --at 2026-11-24T09:00:00Z` on the shipped sheet (`make_sheet.py`, seed 7, 25 customers) with `recorded-answer.json`: one real answer from `claude-haiku-5-5`, recorded on 2026-11-24 (a Claude Code subagent given the request text as its whole prompt; the answer saved as returned).
+It is the real output of `python -I demo.py --case happy-path --as-of 2026-11-24 --at 2026-11-24T09:00:00Z` on the shipped sheet (`make_sheet.py`, seed 7, 25 customers) with `recorded-answer.json`. By the author's statement, that file is an answer from `claude-haiku-5-5`, recorded on 2026-11-24 (a Claude Code subagent given the request text as its whole prompt; the answer saved as returned). Such a subagent runs under its own system prompt, so it is not the same call as `--backend anthropic`. The repository cannot prove the origin: the sha256 in the meta file proves only that the file has not changed since it was saved and that it answers the request built today.
 
 What the checks did with it: 22 of 22 owing customers accepted, 0 item(s) rejected, 0 missing, and 1 note(s) for a person set aside.
 
@@ -10,7 +10,7 @@ The note(s) set aside, as the run report keeps them (with stand-ins), and the re
 
 - "Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept." (the note holds a loose reference to a stand-in: 005, 007, 016)
 
-A note may state only figures that are in the sheet, and a stand-in counts only when it is written in full, such as `Customer 019`. Written any other way, its number reads as a figure the check cannot confirm, and the note goes to a person as set aside instead of passing as checked. The check is strict on purpose: it would rather show a person a note it cannot confirm, even one that is right in substance, as the sheet's own notes on the phone show this one to be.
+A stand-in counts only when it is written in full, such as `Customer 005`. A number with a leading zero outside one, such as 005 in "Customers 005, 007", is a loose reference: the figure check cannot tell what it means, and the note could pass only by chance, so it goes to a person as set aside instead of passing as checked.
 
 The demo printed:
 
