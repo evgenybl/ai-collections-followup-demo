@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-114 tests in 6 files.
+116 tests in 6 files.
 
 ## test_approval.py
 
@@ -60,6 +60,8 @@ The README quotes real output; these tests hold it to that.
 
 - every text about the recording names the note the checks set aside
 - the call list sample is the first five lines of the example
+- the decision commands print what the readme quotes
+- the opening is the title then the badges then two sentences
 - the quoted first lines are what the commands print
 - the stated ci versions are the workflows
 - what is real has no live row and every case has its command

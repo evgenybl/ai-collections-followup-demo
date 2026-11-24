@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import shutil
 import sys
 import unittest
@@ -13,6 +14,7 @@ from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import approval  # noqa: E402
 import demo  # noqa: E402
 import make_examples  # noqa: E402
 import pipeline  # noqa: E402
@@ -79,7 +81,8 @@ class DemoTest(TempTest):
         lines = printed.splitlines()
         self.assertIn("| happened: exit 0; rejected no new rejection;", lines[0])
         self.assertTrue(lines[0].endswith(" | FAIL"))
-        self.assertTrue(lines[2].startswith("wrong-total  exit 0, nothing new set aside,") and lines[2].endswith("FAIL"))
+        self.assertTrue(lines[2].startswith("wrong-total  exit 0, nothing new set aside,"))
+        self.assertTrue(lines[2].endswith("FAIL"))
         self.assertTrue(lines[3].startswith("0 of 1 case(s) ended as expected"))
 
     def test_usage_is_refused(self):
@@ -214,11 +217,41 @@ class ReadmeTest(TempTest):
                         "python -I report.py out-demo/demo-001/happy-path/run --out out-demo/report.html"):
             self.assertIn(command, self.lines)
 
+    def test_the_decision_commands_print_what_the_readme_quotes(self):
+        stamp = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")  # the time of a decision is the time it was taken
+        run, history, reason = str(self.base / "out-run"), str(self.base / "out-history.jsonl"), \
+            "Settle the instalment request first"
+        steps = [("python -I pipeline.py --out out-run", pipeline, ["--out", run]),
+                 ("python -I approval.py list out-run", approval, ["list", run]),
+                 ('python -I approval.py approve out-run --item 1 --by "Your Name"', approval,
+                  ["approve", run, "--item", "1", "--by", "Your Name"]),
+                 (f'python -I approval.py reject out-run --item 2 --by "Your Name" --reason "{reason}"', approval,
+                  ["reject", run, "--item", "2", "--by", "Your Name", "--reason", reason]),
+                 ("python -I approval.py export out-run --history out-history.jsonl", approval,
+                  ["export", run, "--history", history])]
+        for command, module, argv in steps:
+            code, printed, err = call_main(module, argv)
+            self.assertEqual(code, 0, err)
+            quoted = self.lines[self.lines.index("$ " + command) + 1]
+            self.assertEqual(stamp.sub("<time>", quoted), stamp.sub("<time>", printed.splitlines()[0]), command)
+
+    def test_the_opening_is_the_title_then_the_badges_then_two_sentences(self):
+        self.assertEqual(self.lines[0], "# AI Collections Follow-up")
+        badges = re.findall(r"!\[(\w+)\]", self.lines[2])
+        self.assertEqual(badges, ["tests", "python", "dependencies", "data", "license"])
+        self.assertEqual(self.readme.count("actions/workflows/tests.yml/badge.svg"), 1)
+        opening = self.lines[4]
+        self.assertEqual(opening.count(". "), 1)  # two sentences, neither in the first person
+        self.assertNotRegex(opening, r"\b(I|me|my|we|our)\b")
+        self.assertIn("demonstration on invented data", opening)
+        self.assertTrue(opening.endswith("and nothing is ever sent."))
+
     def test_the_stated_ci_versions_are_the_workflows(self):
         workflow = (HERE / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
         self.assertIn('        os: [ubuntu-latest, windows-latest]\n        python-version: ["3.11", "3.13"]\n',
                       workflow)
         self.assertIn("on Linux and Windows with Python 3.11 and 3.13.", self.readme)
+        self.assertIn("![python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue)", self.readme)
 
     def test_what_is_real_has_no_live_row_and_every_case_has_its_command(self):
         table = self.readme.split("## What is real here")[1].split("\n## ")[0]

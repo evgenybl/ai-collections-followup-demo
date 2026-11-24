@@ -1,10 +1,16 @@
-# AI collections follow-up demo
+# AI Collections Follow-up
 
-*Every week I go through who owes me money, decide whom to chase first and write the same reminders again, and I cannot afford one wrong figure in a letter to a customer.*
+[![tests](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml/badge.svg)](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml) ![python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue) ![dependencies](https://img.shields.io/badge/dependencies-none-brightgreen) ![data](https://img.shields.io/badge/data-synthetic-lightgrey) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+A small business, or the office that keeps its books, chases unpaid invoices by hand every week, and one wrong figure in a reminder costs a customer's trust. This is a demonstration on invented data of another way: a model drafts the call list and the reminders, code checks every figure against the sheet, a person approves each draft before it is exported, and nothing is ever sent.
 
 ## What you see
 
 ![The report page of the example run: four figures, the ageing of what is owed, and the call list with each decision](docs/img/report.png)
+
+![A terminal showing the closing table of a real run of the demo: ten cases, each ending in PASS](docs/img/demo.svg)
+
+*The closing table of a real run of `python -I demo.py --out out-demo`, drawn from its output by `tools/term_svg.py`. `make_examples.py` draws it again from a new run, and the CI workflow compares the two.*
 
 The first five lines of the call list the example run drafted, from [`examples/call-list.csv`](examples/call-list.csv). Every name is invented:
 
@@ -26,7 +32,7 @@ Python 3.11 or newer, standard library only, nothing to install. Run from the re
 python -I demo.py --out out-demo
 ```
 
-runs the ten cases of the failure gallery and prints one line for each. The first:
+runs the ten cases of the failure gallery. It prints a detailed line for each case, then the closing table shown above. The first line:
 
 ```
 happy-path | expected: exit 0; the export holds only the approved drafts | happened: exit 0; 22 drafts; items 1 and 4 approved, item 2 rejected (a note names it), 19 pending; the export holds reminders reminder-01.txt, reminder-04.txt and call-list lines 1, 4; history lines 2; report written | PASS
@@ -52,7 +58,26 @@ writes the report page of the first command's happy path; open it in a browser:
 report written to out-demo/report.html | customers owing 22 | waiting for a decision 19 | refused by the checks 0
 ```
 
-Every test runs with `python -I run_tests.py`. The CI workflow is set to run the tests, the whole demo, and the examples written again and compared, on Linux and Windows with Python 3.11 and 3.13.
+### Take the decisions yourself
+
+A run of the pipeline drafts; nothing leaves its folder until a person decides. Each command below is followed by the first line it printed in a real run (`list` prints one line per draft, then a count):
+
+```
+$ python -I pipeline.py --out out-run
+backend recorded | owing 22 | accepted 22 | rejected 0 | missing 0 | rejected notes 1 | sent to customers 0
+$ python -I approval.py list out-run
+item 1 | Cobalt Florist (invented) | 2215.35 | over 90 | pending
+$ python -I approval.py approve out-run --item 1 --by "Your Name"
+item 1: approved by Your Name at 2026-11-24T00:41:35Z
+$ python -I approval.py reject out-run --item 2 --by "Your Name" --reason "Settle the instalment request first"
+item 2: rejected by Your Name at 2026-11-24T00:41:36Z: Settle the instalment request first
+$ python -I approval.py export out-run --history out-history.jsonl
+exported items 1 to approved/ | rejected 1 | pending 20 | history lines added 1 | sent to customers 0
+```
+
+`out-run/approved/` now holds only the approved reminder and its call-list line. With `--history out-history.jsonl`, a run in the next seven days leaves that customer out of the request while the total stays the same. `python -I report.py out-run --out out-run.html` writes the page with the decisions on it.
+
+Every test runs with `python -I run_tests.py`. The CI workflow runs the tests, the whole demo, and `make_examples.py` followed by a git comparison of what it wrote, on Linux and Windows with Python 3.11 and 3.13.
 
 ## How it works
 
@@ -85,7 +110,7 @@ flowchart LR
 | Path | Kind | What was actually run |
 |---|---|---|
 | The model answer the demo replays (`recorded-answer.json`) | Recorded | One real answer from `claude-haiku-5-5` to the request built from the shipped sheet, recorded on 2026-11-24 by a Claude Code subagent given the request text as its whole prompt, and saved as returned. Tests check the sha256 of the request it answers and of the answer file itself. The checks accept all 22 owing customers and set aside one of its notes for a person (see the limits). The first version's real answer to its six-row sheet is kept in `fixtures/`. |
-| The live model path (`--backend anthropic`) | Mock | Tested against a local mock of the Messages API on 127.0.0.1, never against the real service |
+| The live model path (`--backend anthropic`) | Mock | Tested against a local mock of the Messages API on 127.0.0.1, and at its default address with the network call replaced inside the test; never against the real service |
 | The webhook (`--webhook`) | Mock | Tested against a local mock server; no real n8n or Make instance was called |
 | The pipeline, the checks, the run history, the approval, the report, the demo | Local | They run on the reader's computer: `python -I run_tests.py` and `python -I demo.py --out out-demo` |
 
@@ -125,8 +150,6 @@ The wrong answers and broken sheets in [`gallery/`](gallery/README.md) are const
 ## How this was built
 
 Written with Claude Code under the author's direction. Every claim on this page is backed by a test or a command the reader can run: the tests are listed in [`docs/TESTS.md`](docs/TESTS.md).
-
-[![tests](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml/badge.svg)](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml)
 
 ## Origins
 
