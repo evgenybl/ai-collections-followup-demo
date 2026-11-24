@@ -17,6 +17,9 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from spreadsheet import safe_cells  # noqa: E402
+
 # Column names (as they appear in the sheet) and the stand-in each gets.
 PERSONAL = {
     "name": "Customer",
@@ -99,12 +102,17 @@ def main(argv=None):
         columns = reader.fieldnames or []
         rows = list(reader)
     clean, key = pseudonymise(rows, columns)
+    guarded = 0
     with args.out.open("w", encoding="utf-8-sig", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=columns)
-        w.writeheader()
-        w.writerows(clean)
+        w = csv.writer(f)
+        w.writerow(columns)
+        for row in clean:
+            cells, changed = safe_cells(row.get(col) or "" for col in columns)
+            w.writerow(cells)
+            guarded += changed
     args.key.write_text(json.dumps(key, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"rows {len(clean)} | personal values replaced {len(key)} | columns kept {len(columns)}")
+    print(f"rows {len(clean)} | personal values replaced {len(key)} | columns kept {len(columns)} | cells written "
+          f"with a leading apostrophe {guarded}")
     return 0
 
 

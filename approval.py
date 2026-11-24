@@ -195,6 +195,9 @@ def record(folder, item, decision, by, reason=None, at=None):
     if item not in items:
         raise PipelineError(f"this run has no draft with item {item} (its items: "
                             f"{', '.join(str(i) for i in items) or 'none'})", 2)
+    if (by or "").startswith(pipeline.FORMULA_START) or (by or "").strip().startswith(pipeline.FORMULA_START):
+        raise PipelineError("--by may not start with =, +, -, @, a tab or a carriage return: a spreadsheet could run "
+                            "it as a formula", 2)
     by = (by or "").strip()
     if not by:
         raise PipelineError("--by must name the person who decides", 2)
@@ -258,7 +261,8 @@ def export(folder, history=None, as_of=None):
         w = csv.writer(f)
         w.writerow(header + ["approved_by", "approved_at"])
         for draft in approved:
-            w.writerow(rows[draft["item"]] + [last[draft["item"]]["by"], last[draft["item"]]["at"]])
+            w.writerow(pipeline.safe_cells(rows[draft["item"]] + [last[draft["item"]]["by"],
+                                                                  last[draft["item"]]["at"]])[0])
     for draft in approved:
         shutil.copyfile(folder / draft["file"], work / draft["file"])
     work.rename(target)

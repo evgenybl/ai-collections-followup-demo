@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-125 tests in 7 files.
+128 tests in 7 files.
 
 ## test_approval.py
 
@@ -28,6 +28,14 @@ Tests of the approval step: decisions recorded, appended and refused, and the ex
 ## test_checks.py
 
 Tests of the checks added after an independent review: loose references to stand-ins, what a reminder may not hold, the sheet check's limits, the leak guard's whole words, and the amounts kept exact after the scrub.
+
+### FormulaCellTest
+
+A cell a spreadsheet could run as a formula is written with a leading apostrophe in every CSV file.
+
+- a by that starts like a formula is refused and the export adds no second apostrophe
+- a name and a reason that start like a formula are written as text
+- the pseudonymised and the generated sheets are guarded too
 
 ### SheetCheckTest
 

@@ -21,6 +21,9 @@ import io
 import pathlib
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from spreadsheet import safe_cells  # noqa: E402
+
 DEFAULT_SEED = 7
 DEFAULT_CUSTOMERS = 25
 COLUMNS = ["name", "id_number", "phone", "email", "address", "amount_due", "days_late", "notes"]
@@ -147,11 +150,13 @@ def sheet_rows(seed, customers):
 
 
 def sheet_text(rows):
-    """The CSV text: the header and the rows, LF line ends, quoted only where a cell needs it."""
+    """The CSV text: the header and the rows, LF line ends, quoted only where a cell needs it, and a cell a
+    spreadsheet could run as a formula written with a leading apostrophe (spreadsheet.py)."""
     buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=COLUMNS, lineterminator="\n")
-    writer.writeheader()
-    writer.writerows(rows)
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(COLUMNS)
+    for row in rows:
+        writer.writerow(safe_cells(row[column] for column in COLUMNS)[0])
     return buffer.getvalue()
 
 

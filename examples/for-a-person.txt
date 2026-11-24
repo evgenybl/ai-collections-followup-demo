@@ -22,3 +22,4 @@ Customers who owe money and are missing from the answer:
 Notes rejected by the checks:
 - Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept. (the note holds a loose reference to a stand-in: 005, 007, 016)
 
+Cells of call-list.csv written with a leading apostrophe, so that a spreadsheet shows them as text and does not run them as formulas: 0

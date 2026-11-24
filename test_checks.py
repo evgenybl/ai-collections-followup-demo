@@ -1,6 +1,7 @@
 """Tests of the checks added after an independent review: loose references to stand-ins, what a reminder may not
 hold, the sheet check's limits, the leak guard's whole words, and the amounts kept exact after the scrub.
 Run: python -I test_checks.py  (every test file: python -I run_tests.py)"""
+import csv
 import json
 import pathlib
 import sys
@@ -9,8 +10,11 @@ from decimal import Decimal
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import approval  # noqa: E402
+import make_sheet  # noqa: E402
 import pipeline  # noqa: E402
-from testsupport import PROMPT, SHEET, SpyBackend, TempTest, constructed_answer  # noqa: E402
+import pseudonymise  # noqa: E402
+from testsupport import PROMPT, SHEET, SpyBackend, TempTest, call_main, constructed_answer  # noqa: E402
 
 
 class TextCheckTest(unittest.TestCase):
@@ -118,6 +122,57 @@ class SheetCheckTest(TempTest):
         prep = pipeline.prepare(sheet, PROMPT)
         self.assertIn("\nCustomer 001,123456789,1,\n", prep["request"])
         self.assertEqual(prep["expected"]["Customer 001"]["total"], Decimal("123456789"))
+
+
+class FormulaCellTest(TempTest):
+    """A cell a spreadsheet could run as a formula is written with a leading apostrophe in every CSV file."""
+
+    SHEET_TEXT = "name,amount_due,days_late,notes\n=SUM(A1) Shop,100,5,\n@Second Shop,50,2,\n"
+
+    def run_formula_sheet(self):
+        answer = {"call_list": [
+            {"customer": "Customer 001", "priority": 1, "amount": 100, "days_late": 5, "reason": "-- call first",
+             "reminder": "Dear Customer 001, the balance of 100 is 5 days late."},
+            {"customer": "Customer 002", "priority": 2, "amount": 50, "days_late": 2, "reason": "smaller",
+             "reminder": "Dear Customer 002, the balance of 50 is 2 days late."}], "for_a_human": []}
+        out = self.base / "run"
+        pipeline.run(self.write("sheet.csv", self.SHEET_TEXT), PROMPT,
+                     pipeline.RecordedBackend(self.answer_file(answer)), out)
+        return out
+
+    def test_a_name_and_a_reason_that_start_like_a_formula_are_written_as_text(self):
+        out = self.run_formula_sheet()
+        with (out / "call-list.csv").open(encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.reader(f))
+        self.assertEqual(rows[1], ["1", "'=SUM(A1) Shop", "100", "5", "1-30", "'-- call first"])
+        self.assertEqual(rows[2][1], "'@Second Shop")
+        page = (out / "for-a-person.txt").read_text(encoding="utf-8")
+        self.assertIn("does not run them as formulas: 3\n", page)
+        self.assertEqual(json.loads((out / "for-a-person.json").read_text(encoding="utf-8"))["csv_cells_guarded"], 3)
+
+    def test_a_by_that_starts_like_a_formula_is_refused_and_the_export_adds_no_second_apostrophe(self):
+        out = self.run_formula_sheet()
+        for by in ("=1+1", "+1", "-x", "@x", "\t=x", " =x"):
+            code, _, err = call_main(approval, ["approve", str(out), "--item", "1", f"--by={by}"])
+            self.assertEqual(code, 2, repr(by))
+            self.assertIn("--by may not start with =, +, -, @, a tab or a carriage return", err)
+        self.assertFalse((out / "decisions.json").exists())
+        self.assertEqual(call_main(approval, ["approve", str(out), "--item", "1", "--by", "Ann-Marie (invented)"])[0], 0)
+        self.assertEqual(call_main(approval, ["export", str(out)])[0], 0)
+        with (out / "approved" / "call-list.csv").open(encoding="utf-8-sig", newline="") as f:
+            row = list(csv.reader(f))[1]
+        self.assertEqual(row[:2] + row[5:7], ["1", "'=SUM(A1) Shop", "'-- call first", "Ann-Marie (invented)"])
+
+    def test_the_pseudonymised_and_the_generated_sheets_are_guarded_too(self):
+        source = self.write("source.csv", "name,amount_due,days_late,notes\nA Shop,5,1,=cmd|' /C calc'!A0\n")
+        out, key = self.base / "clean.csv", self.base / "key.json"
+        code, printed, _ = call_main(pseudonymise, [str(source), "--out", str(out), "--key", str(key)])
+        self.assertEqual(code, 0)
+        self.assertIn("| cells written with a leading apostrophe 1", printed)
+        self.assertIn("Customer 001,5,1,'=cmd|' /C calc'!A0", out.read_text(encoding="utf-8-sig"))
+        row = dict(zip(make_sheet.COLUMNS, ["+Plus Shop (invented)", "000000001", "000-000-0001",
+                                            "plus@example.com", "1 Example Street Example City", "5", "1", ""]))
+        self.assertIn("\n'+Plus Shop (invented),000000001,", make_sheet.sheet_text([row]))
 
 
 if __name__ == "__main__":

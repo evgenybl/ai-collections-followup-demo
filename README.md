@@ -142,6 +142,7 @@ The wrong answers and broken sheets in [`gallery/`](gallery/README.md) are const
 - **The approval records a name and does not authenticate.** `--by` is whatever the person types.
 - **The history key is a hash, and a hash of a name is not anonymous.** The history file holds no name, but anyone who has the sheet can compute the same key, and a guessed name can be tested against it.
 - **Ageing is computed from the sheet's own delay column.** It is as current as that column, not worked out from invoice dates.
+- **A cell that a spreadsheet could run as a formula is written as text.** In every CSV file this project writes, a cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading apostrophe, and the page for a person says how many cells were changed. Some programs show that apostrophe. `--by` may not start with those characters at all.
 - **A changed draft is detected, not prevented.** The check guards against accidents, not against someone who also edits the run report.
 - **The webhook was tested against a local mock server.** No real n8n or Make instance was called.
 - This is a demonstration of a design, not a product and not a record of client work.

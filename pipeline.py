@@ -47,6 +47,7 @@ from decimal import Decimal
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import pseudonymise  # noqa: E402
+from spreadsheet import FORMULA_START, safe_cells  # noqa: E402,F401
 
 NAME, AMOUNT, DAYS, NOTES = "name", "amount_due", "days_late", "notes"
 ID_NUMBER = "id_number"
@@ -563,9 +564,10 @@ def validate(answer, expected, key, left_out=frozenset()):
     return accepted, rejected, missing, notes, rejected_notes
 
 
-def page_for_a_person(rejected, missing, notes, rejected_notes, key, history=None):
+def page_for_a_person(rejected, missing, notes, rejected_notes, key, history=None, guarded=0):
     """The page a person reads after the run, with the real names restored. It stays on this computer. With a run
-    history, history = (already_drafted, amount_changed, window_days, the sheet's customers) adds two sections."""
+    history, history = (already_drafted, amount_changed, window_days, the sheet's customers) adds two sections.
+    guarded is how many cells of call-list.csv were written with a leading apostrophe (safe_cells)."""
     def section(title, entries):
         return [title] + ([f"- {e}" for e in entries] or ["- none"]) + [""]
 
@@ -583,6 +585,8 @@ def page_for_a_person(rejected, missing, notes, rejected_notes, key, history=Non
         lines += section("Drafted again: the amount changed since the last draft:",
                          [f"{who}: {money(everyone[who]['total'])} now, {r['total']} when drafted on "
                           f"{r['exported_on']}" for who, r in sorted(changed.items())])
+    lines += [f"Cells of call-list.csv written with a leading apostrophe, so that a spreadsheet shows them as text and "
+              f"does not run them as formulas: {guarded}"]
     return pseudonymise.restore("\n".join(lines), key)
 
 
@@ -672,12 +676,15 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
         return pseudonymise.restore(text, key)
 
     out_dir.mkdir(parents=True)
+    guarded = 0
     with (out_dir / "call-list.csv").open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["priority", "customer", "amount", "days_late", "bucket", "reason"])
         for a in accepted:
-            w.writerow([a["priority"], real(a["customer"]), money(a["amount"]), a["days_late"],
-                        bucket_of(prep["expected"][a["customer"]]), real(a["reason"])])
+            cells, changed_cells = safe_cells([a["priority"], real(a["customer"]), money(a["amount"]), a["days_late"],
+                                               bucket_of(prep["expected"][a["customer"]]), real(a["reason"])])
+            w.writerow(cells)
+            guarded += changed_cells
     # The drafts, each with the sha256 of its bytes as written: approval.py refuses to export a changed draft.
     drafts_sha256 = {"call-list.csv": hashlib.sha256((out_dir / "call-list.csv").read_bytes()).hexdigest()}
     drafts = []
@@ -691,10 +698,11 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
                        "amount_changed": a["customer"] in changed})
     page_history = (drafted, changed, window_days, prep["everyone"]) if history is not None else None
     write_text(out_dir / "for-a-person.txt",
-               page_for_a_person(rejected, missing, notes, rejected_notes, key, page_history) + "\n")
+               page_for_a_person(rejected, missing, notes, rejected_notes, key, page_history, guarded) + "\n")
     # The same content, with the real names, in a form report.py can read without parsing the page.
     write_json(out_dir / "for-a-person.json", {
         "note": "For a person to read. It holds real names: keep it on this computer.",
+        "csv_cells_guarded": guarded,
         "for_a_human": [real(n) for n in notes],
         "rejected": [{"customer": real(str(r.get("customer", r.get("item")))), "reason": real(r["reason"])}
                      for r in rejected],
