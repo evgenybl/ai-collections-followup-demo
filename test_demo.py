@@ -206,10 +206,79 @@ class ReadmeTest(TempTest):
         self.readme = (HERE / "README.md").read_text(encoding="utf-8")
         self.lines = self.readme.splitlines()
 
-    def test_the_call_list_sample_is_the_first_five_lines_of_the_example(self):
-        sample = (EXAMPLES / "call-list.csv").read_text(encoding="utf-8-sig").splitlines()[:5]
-        start = self.lines.index(sample[0])
-        self.assertEqual(self.lines[start - 1:start + 6], ["```"] + sample + ["```"])
+    def section(self, heading):
+        return self.readme.split(f"\n## {heading}\n")[1].split("\n## ")[0]
+
+    def test_the_first_screen_quotes_a_real_reminder_and_the_call_list(self):
+        screen = self.section("What you see")
+        reminder = (EXAMPLES / "reminders" / "reminder-01.txt").read_text(encoding="utf-8").rstrip("\n")
+        self.assertIn("\n> " + reminder + "\n", screen)
+        with (EXAMPLES / "call-list.csv").open(encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.DictReader(f))[:4]
+        table = ["| Priority | Customer | Total | Days late | The model's reason |", "|---|---|---|---|---|"]
+        table += [f"| {r['priority']} | {r['customer']} | {r['amount']} | {r['days_late']} | {r['reason']} |"
+                  for r in rows]
+        self.assertIn("\n".join(table), screen)
+        self.assertIn("[`examples/report.html`](examples/report.html)", screen)
+        self.assertIn("a page to open in a browser after cloning the repository", screen)
+        self.assertNotIn("![", screen)  # no picture on the first screen until one exists from a real render
+
+    def test_every_image_a_markdown_file_embeds_exists(self):
+        files = [p for p in HERE.rglob("*.md")
+                 if not any(part.startswith((".", "out-")) for part in p.relative_to(HERE).parts)]
+        self.assertIn(HERE / "README.md", files)
+        for path in files:
+            for target in re.findall(r"!\[[^\]]*\]\(([^)\s]+)", path.read_text(encoding="utf-8")):
+                if not target.startswith(("http://", "https://")):
+                    self.assertTrue((path.parent / target).is_file(), f"{path.name} embeds {target}")
+
+    def test_the_terms_are_explained_where_they_first_appear(self):
+        body = self.readme.split("\n", 1)[1].lower()
+        for term, explanation in [("stand-in", "the placeholder the model sees instead of a personal value"),
+                                  ("ageing", "how long the money has been owed"),
+                                  ("recorded answer", "one model answer saved to a file and replayed by every run")]:
+            first = body.index(term)
+            self.assertIn(explanation, body[first:first + 160], term)
+
+    def test_the_picture_of_the_demo_is_with_what_can_go_wrong_and_usage_conditions_come_last(self):
+        self.assertIn("](docs/img/demo.svg)", self.section("What can go wrong, and what happens"))
+        headings = [line[3:] for line in self.lines if line.startswith("## ")]
+        self.assertEqual(headings[-3:], ["Usage conditions", "Licence", "Author"])
+        conditions = self.section("Usage conditions")
+        for words in ("a demonstration on invented data", "Do not point it at real customer data", "no warranty",
+                      "MIT"):
+            self.assertIn(words, conditions)
+
+    def test_what_leaves_the_computer_is_said_where_sending_is(self):
+        self.assertIn("nothing is ever sent to a customer, and only when asked does anything leave the computer (the "
+                      "request to the model on the live path, and a run summary to a webhook)", self.lines[2])
+        self.assertNotRegex(self.readme.lower(), r"nothing is (ever )?sent\.")
+        self.assertIn("Two things leave the computer, and only when asked: the request to the model on the live path",
+                      self.readme)
+
+    def test_the_readme_states_the_recordings_result_and_its_origin_as_a_statement(self):
+        prep = pipeline.prepare(SHEET, HERE / "prompt.txt")
+        accepted, rejected, missing, _, rejected_notes = pipeline.validate(
+            pipeline.parse_answer(RECORDED.read_text(encoding="utf-8")), prep["expected"], prep["key"])
+        self.assertEqual((len(accepted), rejected, missing, len(rejected_notes)), (22, [], [], 1))
+        text = " ".join(self.readme.split())
+        self.assertIn(f"\"{rejected_notes[0]['note']}\"", text)
+        self.assertIn(f"({rejected_notes[0]['reason']})", text)
+        self.assertIn("The checks accept all 22 owing customers of it and set aside one note for a person", text)
+        real = self.section("What is real here")
+        for words in ("By the author's statement", "runs under its own system prompt", "cannot prove the origin",
+                      "proves only that the file has not changed since it was saved"):
+            self.assertIn(words, real)
+        self.assertIn("with one exception: that the recorded answer is a model's answer rests on the author's "
+                      "statement", self.section("How this was built"))
+
+    def test_the_figure_check_is_stated_exactly(self):
+        limits = " ".join(self.section("Limits, stated plainly").split())
+        for words in ("Every number written in digits must be one of that customer's own figures",
+                      "It does not know which number means what, so two right numbers swapped",
+                      "a loose reference to a stand-in", "a numeral other than 0 to 9",
+                      "a per cent sign or a web address"):
+            self.assertIn(words, limits)
 
     def test_the_quoted_first_lines_are_what_the_commands_print(self):
         self.assertEqual(demo.CASES[0][0], "happy-path")  # so the whole demo's first line is the happy path's
@@ -231,6 +300,7 @@ class ReadmeTest(TempTest):
             "Settle the instalment request first"
         steps = [("python -I pipeline.py --out out-run", pipeline, ["--out", run]),
                  ("python -I approval.py list out-run", approval, ["list", run]),
+                 ("python -I approval.py show out-run --item 1", approval, ["show", run, "--item", "1"]),
                  ('python -I approval.py approve out-run --item 1 --by "Your Name"', approval,
                   ["approve", run, "--item", "1", "--by", "Your Name"]),
                  (f'python -I approval.py reject out-run --item 2 --by "Your Name" --reason "{reason}"', approval,
@@ -243,16 +313,17 @@ class ReadmeTest(TempTest):
             quoted = self.lines[self.lines.index("$ " + command) + 1]
             self.assertEqual(stamp.sub("<time>", quoted), stamp.sub("<time>", printed.splitlines()[0]), command)
 
-    def test_the_opening_is_the_title_then_the_badges_then_two_sentences(self):
+    def test_the_opening_is_the_title_then_two_sentences_and_the_badges_start_try_it(self):
         self.assertEqual(self.lines[0], "# AI Collections Follow-up")
-        badges = re.findall(r"!\[(\w+)\]", self.lines[2])
-        self.assertEqual(badges, ["tests", "python", "dependencies", "data", "license"])
-        self.assertEqual(self.readme.count("actions/workflows/tests.yml/badge.svg"), 1)
-        opening = self.lines[4]
+        opening = self.lines[2]
+        self.assertEqual(self.lines[4], "## What you see")
         self.assertEqual(opening.count(". "), 1)  # two sentences, neither in the first person
         self.assertNotRegex(opening, r"\b(I|me|my|we|our)\b")
         self.assertIn("demonstration on invented data", opening)
-        self.assertTrue(opening.endswith("and nothing is ever sent."))
+        try_it = self.section("Try it in two minutes").splitlines()
+        badges = re.findall(r"!\[(\w+)\]", try_it[1])
+        self.assertEqual(badges, ["tests", "python", "dependencies", "data", "license"])
+        self.assertEqual(self.readme.count("actions/workflows/tests.yml/badge.svg"), 1)
 
     def test_the_stated_ci_versions_are_the_workflows(self):
         workflow = (HERE / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")

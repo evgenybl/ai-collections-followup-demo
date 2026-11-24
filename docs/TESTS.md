@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-144 tests in 7 files.
+150 tests in 7 files.
 
 ## test_approval.py
 
@@ -101,13 +101,19 @@ Tests of the failure gallery (demo.py and gallery/), the examples and the list o
 
 The README quotes real output; these tests hold it to that.
 
+- every image a markdown file embeds exists
 - no text describes an earlier recording
-- the call list sample is the first five lines of the example
 - the decision commands print what the readme quotes
-- the opening is the title then the badges then two sentences
+- the figure check is stated exactly
+- the first screen quotes a real reminder and the call list
+- the opening is the title then two sentences and the badges start try it
+- the picture of the demo is with what can go wrong and usage conditions come last
 - the quoted first lines are what the commands print
+- the readme states the recordings result and its origin as a statement
 - the stated ci versions are the workflows
+- the terms are explained where they first appear
 - what is real has no live row and every case has its command
+- what leaves the computer is said where sending is
 
 ## test_history.py
 

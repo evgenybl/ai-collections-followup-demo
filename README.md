@@ -1,30 +1,27 @@
 # AI Collections Follow-up
 
-[![tests](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml/badge.svg)](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml) ![python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue) ![dependencies](https://img.shields.io/badge/dependencies-none-brightgreen) ![data](https://img.shields.io/badge/data-synthetic-lightgrey) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-
-A small business, or the office that keeps its books, chases unpaid invoices by hand every week, and one wrong figure in a reminder costs a customer's trust. This is a demonstration on invented data of another way: a model drafts the call list and the reminders, code checks every figure against the sheet, a person approves each draft before it is exported, and nothing is ever sent.
+A small business, or the office that keeps its books, chases unpaid invoices by hand every week, and one wrong figure in a reminder costs a customer's trust. This is a demonstration on invented data of another way: a model drafts the call list and the reminders, code checks every figure against the sheet, and a person approves each draft before it is exported; nothing is ever sent to a customer, and only when asked does anything leave the computer (the request to the model on the live path, and a run summary to a webhook).
 
 ## What you see
 
-![The report page of the example run: four figures, the ageing of what is owed, and the call list with each decision](docs/img/report.png)
+One reminder draft of the example run, quoted whole from [`examples/reminders/reminder-01.txt`](examples/reminders/reminder-01.txt). It comes from the recorded answer (one model answer saved to a file and replayed by every run, so the demo needs no API key), and code checked that its only figure is this customer's total:
 
-![A terminal showing the closing table of a real run of the demo: ten cases, each ending in PASS](docs/img/demo.svg)
+> Dear Cobalt Bakery (invented), this is a friendly reminder that a total of 12295 is outstanding on your account. Please arrange payment at your earliest convenience, or contact us if you have any questions. Thank you.
 
-*The closing table of a real run of `python -I demo.py --out out-demo`, drawn from its output by `tools/term_svg.py`. `make_examples.py` draws it again from a new run, and the CI workflow compares the two.*
+The first four lines of the call list it belongs to, from [`examples/call-list.csv`](examples/call-list.csv). Every name is invented:
 
-The first five lines of the call list the example run drafted, from [`examples/call-list.csv`](examples/call-list.csv). Every name is invented:
+| Priority | Customer | Total | Days late | The model's reason |
+|---|---|---|---|---|
+| 1 | Cobalt Bakery (invented) | 12295 | 123 | 123 days late on 12295 owed, and the invoice is disputed, so the dispute needs settling on the call. |
+| 2 | Quarry Laundry (invented) | 13585 | 98 | 98 days late on 13585 owed, and it has asked to split the payment into two instalments. |
+| 3 | Bramble Framing (invented) | 13995 | 75 | 75 days late on 13995 owed, and it promised to pay by the end of the month, so check whether that promise holds. |
+| 4 | Juniper Tile Works (invented) | 21655 | 47 | 47 days late on 21655 owed, and it says the invoice never arrived, so the invoice should be resent first. |
 
-```
-priority,customer,amount,days_late,bucket,reason
-1,Cobalt Bakery (invented),12295,123,over 90,"123 days late on 12295 owed, and the invoice is disputed, so the dispute needs settling on the call."
-2,Quarry Laundry (invented),13585,98,over 90,"98 days late on 13585 owed, and it has asked to split the payment into two instalments."
-3,Bramble Framing (invented),13995,75,61-90,"75 days late on 13995 owed, and it promised to pay by the end of the month, so check whether that promise holds."
-4,Juniper Tile Works (invented),21655,47,31-60,"47 days late on 21655 owed, and it says the invoice never arrived, so the invoice should be resent first."
-```
-
-The order and the reasons are a real model's, from the recorded answer; every figure in them was checked against the sheet.
+The same run wrote [`examples/report.html`](examples/report.html), one page for a person with the figures, the ageing (how long the money has been owed, from current to over 90 days), the call list with each decision, and every draft. It is a page to open in a browser after cloning the repository; GitHub shows its source, not the page.
 
 ## Try it in two minutes
+
+[![tests](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml/badge.svg)](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml) ![python](https://img.shields.io/badge/python-3.11%20%7C%203.13-blue) ![dependencies](https://img.shields.io/badge/dependencies-none-brightgreen) ![data](https://img.shields.io/badge/data-synthetic-lightgrey) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Python 3.11 or newer, standard library only, nothing to install. Run from the repository's folder:
 
@@ -32,7 +29,7 @@ Python 3.11 or newer, standard library only, nothing to install. Run from the re
 python -I demo.py --out out-demo
 ```
 
-runs the ten cases of the failure gallery. It prints a detailed line for each case, then the closing table shown above. The first line:
+runs the ten cases of the failure gallery. It prints a detailed line for each case, then a closing table (pictured under [What can go wrong](#what-can-go-wrong-and-what-happens)). The first line:
 
 ```
 happy-path | expected: exit 0; the export holds only the approved drafts | happened: exit 0; 22 drafts; items 3 and 5 approved, item 1 rejected (a note names it), 19 pending; the export holds reminders reminder-03.txt, reminder-05.txt and call-list lines 3, 5; history lines 2; report written | PASS
@@ -60,17 +57,19 @@ report written to out-demo/report.html | customers owing 22 | waiting for a deci
 
 ### Take the decisions yourself
 
-A run of the pipeline drafts; nothing leaves its folder until a person decides. Each command below is followed by the first line it printed in a real run (`list` prints one line per draft, then a count):
+A run of the pipeline drafts; nothing leaves its folder until a person decides. Each command below is followed by the first line it printed in a real run (`list` prints one line per draft, then a count; `show` then prints the model's reason and the reminder):
 
 ```
 $ python -I pipeline.py --out out-run
 backend recorded | owing 22 | accepted 22 | rejected 0 | missing 0 | rejected notes 1 | sent to customers 0
 $ python -I approval.py list out-run
 item 1 | Cobalt Bakery (invented) | 12295 | over 90 | pending
+$ python -I approval.py show out-run --item 1
+item 1 | Cobalt Bakery (invented) | 12295 | 123 days late | over 90 | pending
 $ python -I approval.py approve out-run --item 1 --by "Your Name"
-item 1: approved by Your Name at 2026-11-24T01:12:48Z
+item 1: approved by Your Name at 2026-11-24T01:42:28Z
 $ python -I approval.py reject out-run --item 2 --by "Your Name" --reason "Settle the instalment request first"
-item 2: rejected by Your Name at 2026-11-24T01:12:48Z: Settle the instalment request first
+item 2: rejected by Your Name at 2026-11-24T01:42:29Z: Settle the instalment request first
 $ python -I approval.py export out-run --history out-history.jsonl
 exported items 1 to approved/ | rejected 1 | pending 20 | history lines added 1 | sent to customers 0
 ```
@@ -80,6 +79,8 @@ exported items 1 to approved/ | rejected 1 | pending 20 | history lines added 1 
 Every test runs with `python -I run_tests.py`. The CI workflow runs the tests, the whole demo, and `make_examples.py` followed by a git comparison of what it wrote, on Linux and Windows with Python 3.11 and 3.13.
 
 ## How it works
+
+A stand-in is the placeholder the model sees instead of a personal value, such as `Customer 001` for a customer's name.
 
 ```mermaid
 flowchart LR
@@ -97,24 +98,28 @@ flowchart LR
     P --> R[Report page]
 ```
 
-1. **The personal columns never reach the model.** `pipeline.py` checks the sheet first and refuses it before anything is sent if a column is missing or an amount or a delay is not a plain number. Names, identity numbers, phones, e-mail addresses and street addresses become stand-ins such as `Customer 001`; the notes are scrubbed; a last guard refuses the run if a personal value is still in the request.
+1. **The personal columns never reach the model.** `pipeline.py` checks the sheet first and refuses it before anything is sent if a column is missing or spelled in another letter case, or an amount or a delay is not a plain number. Names, identity numbers, phones, e-mail addresses and street addresses become stand-ins; the notes are scrubbed; a last guard refuses the run if a personal value is still in the request.
 2. **What was already drafted is left out.** With `--history`, a customer whose draft was approved and exported inside the window, with the same total, is not asked about again. The window is a draft exported fewer than N days before the as-of date, so ages 0 to N-1 (N is `--window-days`, 7 by default). A changed total is drafted again and marked. When everyone owing was already drafted, the model is not called at all.
 3. **Every figure the model writes in digits is checked against the sheet.** The total and the days late must match exactly; a reminder may name only its own customer and state only its total and delay. Anything that fails is rejected and listed for a person. Each customer's ageing bucket (current, 1-30, 31-60, 61-90, over 90) is computed from the sheet, not asked of the model.
-4. **A person decides.** `approval.py` records an approval or a rejection for each draft, with who and when, and exports only the approved ones, together with a line in the run history. It refuses decisions from another run and drafts changed after they were written.
-5. **A person reads one page.** `report.py` writes a self-contained HTML page: the figures, the ageing, the call list with each decision, the drafts, what was refused, and what was already drafted.
+4. **A person decides.** `approval.py` shows each draft and records an approval or a rejection, with who and when, and exports only the approved ones, together with a line in the run history. It refuses decisions from another run and drafts changed after they were written, and it does not export a customer a second time inside the window.
+5. **A person reads one page.** `report.py` writes a self-contained HTML page: the figures, the ageing, the call list with each decision, the drafts, what was refused, and what was already drafted. Its labels are earned: "Recorded" only for the shipped recording on its own request, "Synthetic data" only for a sheet this repository ships.
 
-**Nothing is sent to any customer.** There is no send step anywhere, and every run report says `"sent_to_customers": 0`. The design, and why it is this way, is in [`docs/DESIGN.md`](docs/DESIGN.md).
+**Nothing is sent to a customer.** There is no send step anywhere, and every run report says `"sent_to_customers": 0`. Two things leave the computer, and only when asked: the request to the model on the live path (`--backend anthropic`), and the run summary, with stand-ins only, to a webhook (`--webhook`), which goes to the address given and follows no proxy and no redirect. The design, and why it is this way, is in [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## What is real here
 
 | Path | Kind | What was actually run |
 |---|---|---|
-| The model answer the demo replays (`recorded-answer.json`) | Recorded | One real answer from `claude-haiku-5-5` to the request built from the shipped sheet, recorded on 2026-11-24 by a Claude Code subagent given the request text as its whole prompt, and saved as returned. Tests check the sha256 of the request it answers and of the answer file itself. The checks accept all 22 owing customers. The first version's real answer to its six-row sheet is kept in `fixtures/`. |
+| The answer the demo replays (`recorded-answer.json`) | Recorded | By the author's statement, an answer from `claude-haiku-5-5` to the request built from the shipped sheet, obtained on 2026-11-24 by giving a Claude Code subagent the request text as its whole prompt, and saved as returned. Such a subagent runs under its own system prompt, so it is not the same call `--backend anthropic` would make. The repository cannot prove the origin: the sha256 in its meta file proves only that the file has not changed since it was saved and that it answers the request the pipeline builds today. The checks accept all 22 owing customers of it and set aside one note for a person (see the limits). The first version's answer to its six-row sheet is kept in `fixtures/`, on the same terms. |
 | The live model path (`--backend anthropic`) | Mock | Tested against a local mock of the Messages API on 127.0.0.1, and at its default address with the network call replaced inside the test; never against the real service |
 | The webhook (`--webhook`) | Mock | Tested against a local mock server; no real n8n or Make instance was called |
 | The pipeline, the checks, the run history, the approval, the report, the demo | Local | They run on the reader's computer: `python -I run_tests.py` and `python -I demo.py --out out-demo` |
 
 ## What can go wrong, and what happens
+
+![A terminal showing the closing table of a real run of the demo: ten cases, each ending in PASS](docs/img/demo.svg)
+
+*The closing table of a real run of `python -I demo.py --out out-demo`, drawn from its output by `tools/term_svg.py`. `make_examples.py` draws it again from a new run, and the CI workflow compares the two.*
 
 The wrong answers and broken sheets in [`gallery/`](gallery/README.md) are constructed, not recorded: each is the recorded answer or the shipped sheet with one change, and `gallery/README.md` says which.
 
@@ -134,14 +139,15 @@ The wrong answers and broken sheets in [`gallery/`](gallery/README.md) are const
 ## Limits, stated plainly
 
 - **Synthetic data.** Every customer is an invented business whose name ends in "(invented)", every e-mail address is at example.com, and the identity numbers and phone numbers are placeholders. No real person or business is in any file.
+- **What the figure check is, exactly.** Every number written in digits must be one of that customer's own figures: in a reminder only the total and the days late, in the model's reason any amount or delay of the customer's own rows or their total, and in a note for a person any figure of the sheet. It does not know which number means what, so two right numbers swapped, such as the total and the days late, pass. A number written in words, such as "thirty days", is not checked. It refuses what could pass only by chance: a number with a leading zero outside a stand-in written in full (a loose reference to a stand-in) and a numeral other than 0 to 9; a reminder may also not hold a per cent sign or a web address.
+- **The recorded answer has one note set aside, for that reason.** Its note "Customers 005, 007 and 016 promised to pay by the end of the month; check whether the promise is kept." refers to three customers by bare numbers instead of their stand-ins, and is set aside (the note holds a loose reference to a stand-in: 005, 007, 016). Before that check, it passed only because 5, 7 and 16 happen to be figures in the sheet. The page for a person ends with a key of the customers, so that a person can read it.
 - **One recorded model answer is not a measure of reliability.** Another run may order the list differently or make a mistake. The checks catch wrong figures and invented customers. They do not judge whether the order is wise; that stays with a person.
 - **The live API path was tested against a local mock, not against the real service.** The mock answers in the documented shape of the Messages API.
-- **Figures are checked only when they are written in digits.** A number written in words, such as "thirty days", is not checked.
 - **The pseudonymiser is a teaching aid, not a privacy product.** Inside a note it finds only the sheet's own values, written the same way, and three common patterns. A name or a number written differently gets through. It makes no legal claim.
-- **Customers are told apart by the name column alone.** Two different people with the same name become one customer, and their rows are added together.
+- **Customers are told apart by the name column alone.** Two different people with the same name become one customer, and their rows are added together; two spellings of one name are two customers.
 - **The approval records a name and does not authenticate.** `--by` is whatever the person types.
 - **The history key is a hash, and a hash of a name is not anonymous.** The history file holds no name, but anyone who has the sheet can compute the same key, and a guessed name can be tested against it.
-- **Ageing is computed from the sheet's own delay column.** It is as current as that column, not worked out from invoice dates.
+- **Ageing is computed from the sheet's own delay column.** It is as current as that column, not worked out from invoice dates, and only rows that still owe money count.
 - **A cell that a spreadsheet could run as a formula is written as text.** In every CSV file this project writes, a cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading apostrophe, and the page for a person says how many cells were changed. Some programs show that apostrophe. `--by` may not start with those characters at all.
 - **A changed draft is detected, not prevented.** The check guards against accidents, not against someone who also edits the run report.
 - **The webhook was tested against a local mock server.** No real n8n or Make instance was called.
@@ -149,11 +155,18 @@ The wrong answers and broken sheets in [`gallery/`](gallery/README.md) are const
 
 ## How this was built
 
-Written with Claude Code under the author's direction. Every claim on this page is backed by a test or a command the reader can run: the tests are listed in [`docs/TESTS.md`](docs/TESTS.md).
+Written with Claude Code under the author's direction. Every claim on this page is backed by a test or a command the reader can run, with one exception: that the recorded answer is a model's answer rests on the author's statement, which no file in the repository can prove. The tests are listed in [`docs/TESTS.md`](docs/TESTS.md).
 
 ## Origins
 
-The first version of this demo had a six-row sheet and one real model answer to it; both are kept in `fixtures/`, with the tests written for them. The design in one line has not changed: the AI drafts, a script verifies, a person approves.
+The first version of this demo had a six-row sheet, a shorter prompt and one model answer to them; all three are kept in `fixtures/`, with the tests written for them. The design in one line has not changed: the AI drafts, a script verifies, a person approves.
+
+## Usage conditions
+
+- This is a demonstration on invented data.
+- Do not point it at real customer data without the checks, agreements and review that a real deployment needs: who may see the data, where it is processed and kept, and who answers for what is sent.
+- It comes with no warranty of any kind.
+- It is licensed under MIT.
 
 ## Licence
 
