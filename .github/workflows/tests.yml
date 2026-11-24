@@ -11,15 +11,31 @@ permissions:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    name: ${{ matrix.os }}, Python ${{ matrix.python-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
       - name: Run the tests
-        run: python -I test_pipeline.py
+        run: python -I run_tests.py
+      - name: Run the whole demo
+        run: python -I demo.py --out out-demo
+      - name: Write the examples, the gallery and the test list again, and compare
+        run: |
+          python -I make_examples.py
+          git diff --exit-code -- examples gallery docs/TESTS.md
+          test -z "$(git status --porcelain -- examples gallery docs)"
       - name: Run the pipeline on the recorded answer
         run: python -I pipeline.py --out out-run
       - name: Print the model request

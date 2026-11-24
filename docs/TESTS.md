@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-107 tests in 6 files.
+112 tests in 6 files.
 
 ## test_approval.py
 
@@ -51,6 +51,16 @@ Tests of the failure gallery (demo.py and gallery/), the examples and the list o
 - each wrong answer is the recorded answer with one change
 - the gallery files are what make examples writes
 - the gallery readme names every file and case
+
+### ReadmeTest
+
+The README quotes real output; these tests hold it to that.
+
+- the call list sample is the first five lines of the example
+- the quoted first lines are what the commands print
+- the readme says what the recorded answer is
+- the stated ci versions are the workflows
+- what is real has no live row and every case has its command
 
 ## test_history.py
 

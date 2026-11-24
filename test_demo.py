@@ -16,6 +16,7 @@ sys.path.insert(0, str(HERE))
 import demo  # noqa: E402
 import make_examples  # noqa: E402
 import pipeline  # noqa: E402
+import report  # noqa: E402
 import run_tests  # noqa: E402
 from testsupport import RECORDED, SHEET, TempTest, call_main  # noqa: E402
 
@@ -143,10 +144,10 @@ class ExamplesTest(unittest.TestCase):
         with (EXAMPLES / "approved" / "call-list.csv").open(encoding="utf-8-sig", newline="") as f:
             self.assertEqual([int(row["priority"]) for row in csv.DictReader(f)], approved)
         self.assertEqual(len((EXAMPLES / "history.jsonl").read_text(encoding="utf-8").splitlines()), len(approved))
-        report = json.loads((EXAMPLES / "run-report.json").read_text(encoding="utf-8"))
+        run_report = json.loads((EXAMPLES / "run-report.json").read_text(encoding="utf-8"))
         for name in ("call-list.csv", "reminders/reminder-01.txt"):
             data = (EXAMPLES / name).read_bytes()
-            self.assertEqual(hashlib.sha256(data).hexdigest(), report["drafts_sha256"][name], name)
+            self.assertEqual(hashlib.sha256(data).hexdigest(), run_report["drafts_sha256"][name], name)
 
     def test_the_list_of_tests_is_up_to_date(self):
         self.assertEqual((HERE / "docs" / "TESTS.md").read_text(encoding="utf-8"), run_tests.markdown(),
@@ -158,6 +159,56 @@ class ExamplesTest(unittest.TestCase):
                 text = path.read_bytes().decode("utf-8")
                 for marker in (str(HERE), HERE.as_posix(), "C:\\", "/home/", "/tmp/", "\\Users\\"):
                     self.assertNotIn(marker, text, path)
+
+
+class ReadmeTest(TempTest):
+    """The README quotes real output; these tests hold it to that."""
+
+    def setUp(self):
+        super().setUp()
+        self.readme = (HERE / "README.md").read_text(encoding="utf-8")
+        self.lines = self.readme.splitlines()
+
+    def test_the_call_list_sample_is_the_first_five_lines_of_the_example(self):
+        sample = (EXAMPLES / "call-list.csv").read_text(encoding="utf-8-sig").splitlines()[:5]
+        start = self.lines.index(sample[0])
+        self.assertEqual(self.lines[start - 1:start + 6], ["```"] + sample + ["```"])
+
+    def test_the_quoted_first_lines_are_what_the_commands_print(self):
+        self.assertEqual(demo.CASES[0][0], "happy-path")  # so the whole demo's first line is the happy path's
+        for case in ("happy-path", "bad-sheet"):
+            code, printed, _ = call_main(demo, ["--case", case, "--out", str(self.base / "out-demo")])
+            self.assertEqual(code, 0)
+            self.assertIn(printed.splitlines()[0], self.lines)
+        run = self.base / "out-demo" / "demo-001" / "happy-path" / "run"
+        code, printed, _ = call_main(report, [str(run), "--out", str(self.base / "out-demo" / "report.html")])
+        self.assertEqual(code, 0)
+        self.assertIn(printed.strip().replace(self.base.as_posix() + "/", ""), self.lines)
+        for command in ("python -I demo.py --out out-demo", "python -I demo.py --case bad-sheet --out out-demo",
+                        "python -I report.py out-demo/demo-001/happy-path/run --out out-demo/report.html"):
+            self.assertIn(command, self.lines)
+
+    def test_the_stated_ci_versions_are_the_workflows(self):
+        workflow = (HERE / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+        self.assertIn('        os: [ubuntu-latest, windows-latest]\n        python-version: ["3.11", "3.13"]\n',
+                      workflow)
+        self.assertIn("on Linux and Windows with Python 3.11 and 3.13.", self.readme)
+
+    def test_what_is_real_has_no_live_row_and_every_case_has_its_command(self):
+        table = self.readme.split("## What is real here")[1].split("\n## ")[0]
+        kinds = [row.split(" | ")[1] for row in table.splitlines() if row.startswith("| ") and " | " in row]
+        self.assertEqual(kinds[1:], ["Recorded", "Mock", "Mock", "Local"])
+        self.assertNotIn("Live", kinds)
+        for name in CASE_NAMES:
+            self.assertIn(f"| `{name}` |", self.readme)
+            self.assertIn(f"`python -I demo.py --case {name} --out out-demo`", self.readme)
+
+    def test_the_readme_says_what_the_recorded_answer_is(self):
+        meta = json.loads((HERE / "recorded-answer.meta.json").read_text(encoding="utf-8"))
+        if meta["route"] == "constructed placeholder, to be replaced by a real recording":
+            self.assertIn("**placeholder constructed from the sheet's own figures**", self.readme)
+        else:
+            self.assertNotIn("placeholder", self.readme, "the README still calls the recorded answer a placeholder")
 
 
 if __name__ == "__main__":

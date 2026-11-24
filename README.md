@@ -1,112 +1,136 @@
 # AI collections follow-up demo
 
-**An AI-assisted business workflow in which the personal columns never reach the model, and every figure the model writes in digits is checked against the sheet before a person reads it.**
+*Every week I go through who owes me money, decide whom to chase first and write the same reminders again, and I cannot afford one wrong figure in a letter to a customer.*
 
-[![tests](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml/badge.svg)](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml)
-![python](https://img.shields.io/badge/python-3.13-blue)
-![dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
-![data](https://img.shields.io/badge/data-synthetic-lightgrey)
-[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+## What you see
 
-## The task
+![The report page of the example run: four figures, the ageing of what is owed, and the call list with each decision](docs/img/report.png)
 
-A small business, or the accounting office that serves it, keeps a sheet of customers who owe money. Every week someone decides whom to call first and writes the reminders. This pipeline does the routine part and leaves the judgment with a person.
+The first five lines of the call list the example run drafted, from [`examples/call-list.csv`](examples/call-list.csv). Every name is invented:
+
+```
+priority,customer,amount,days_late,bucket,reason
+1,Quarry Laundry (invented),13585,98,over 90,"A balance of 13,585; the oldest open invoice is 98 days late."
+2,Cobalt Bakery (invented),12295,123,over 90,"A balance of 12,295; the oldest open invoice is 123 days late."
+3,Cobalt Florist (invented),2215.35,173,over 90,"A balance of 2,215.35; the oldest open invoice is 173 days late."
+4,Lantern Locksmiths (invented),14171.5,64,61-90,"A balance of 14,171.50; the oldest open invoice is 64 days late."
+```
+
+At this commit the model answer behind it is a placeholder constructed from the sheet's own figures, not a model's answer: see [What is real here](#what-is-real-here).
+
+## Try it in two minutes
+
+Python 3.11 or newer, standard library only, nothing to install. Run from the repository's folder:
+
+```
+python -I demo.py --out out-demo
+```
+
+runs the ten cases of the failure gallery and prints one line for each. The first:
+
+```
+happy-path | expected: exit 0; the export holds only the approved drafts | happened: exit 0; 22 drafts; items 3 and 6 approved, item 1 rejected (a note names it), 19 pending; the export holds reminders reminder-03.txt, reminder-06.txt and call-list lines 3, 6; history lines 2; report written | PASS
+```
+
+```
+python -I demo.py --case bad-sheet --out out-demo
+```
+
+runs one case:
+
+```
+bad-sheet | expected: refused before anything is sent, exit 2, nothing written | happened: exit 2; nothing written; REFUSED: row 2 of the sheet: amount_due '4,200' is not a plain decimal number of 0 or more | PASS
+```
+
+```
+python -I report.py out-demo/demo-001/happy-path/run --out out-demo/report.html
+```
+
+writes the report page of the first command's happy path; open it in a browser:
+
+```
+report written to out-demo/report.html | customers owing 22 | waiting for a decision 19 | refused by the checks 0
+```
+
+Every test runs with `python -I run_tests.py`. The CI workflow is set to run the tests, the whole demo, and the examples written again and compared, on Linux and Windows with Python 3.11 and 3.13.
 
 ## How it works
 
 ```mermaid
 flowchart LR
     A[Customer sheet<br/>names, IDs, phones] --> B[Personal columns become<br/>stand-ins, notes scrubbed]
-    B --> C[Model drafts a call list<br/>and reminders as JSON]
-    C --> D{Every figure in digits<br/>checked against the sheet}
-    D -- passes --> E[Stand-ins mapped back<br/>on this computer]
-    D -- fails --> F[Rejected, listed<br/>for a person]
-    E --> G[Drafts for a person<br/>to read and approve]
+    H[(Run history<br/>hashed keys, no names)] --> C
+    B --> C{Exported inside the window<br/>with the same total?}
+    C -- yes --> S[Left out and listed<br/>as already drafted]
+    C -- no --> D[Model drafts a call list<br/>and reminders as JSON]
+    D --> E{Every figure in digits<br/>checked against the sheet}
+    E -- fails --> F[Rejected, listed<br/>for a person]
+    E -- passes --> G[Stand-ins mapped back<br/>on this computer]
+    G --> P[A person approves<br/>or rejects each draft]
+    P -- approved --> X[Export of the approved drafts<br/>and a history line]
+    X --> H
+    P --> R[Report page]
 ```
 
-1. **The personal columns never reach the model.** The sheet is checked first: the needed columns must be there, and every amount and every delay must be a plain number. A sheet that fails is refused before anything is sent. Names, identity numbers, phones, e-mail addresses and street addresses become stand-ins such as `Customer 001`. The notes are scrubbed of the sheet's own personal values (as whole words, in any letter case) and of three common patterns: a phone number, an e-mail address and a nine-digit number. A name or a number written differently inside a note can still get through (see the limits below). A last guard refuses the run if any personal value of the sheet is still in the request. The key that maps the stand-ins back stays on your computer.
-2. **The model gets only the four columns the task needs**, with a fixed prompt. It returns a ranked call list and a short reminder per customer, as JSON.
-3. **Every figure the model writes in digits is checked against the sheet.** The amount must equal the customer's total exactly, and the days late the largest delay. A reminder may name only its own customer, may state only the total and the days late, and must state the total. A reason may state only that customer's own figures. A note for a person may state only figures that are in the sheet. A stand-in that does not exist in this run (such as `ID 777`) rejects the text it is in. A wrong total, an invented customer, a customer who has already paid, a figure of the wrong kind, or a text that breaks these rules is rejected and listed for a person. A customer the model left out is listed too.
-4. **The stand-ins are mapped back to the real names locally.**
-5. The call list, the reminder drafts, a page for a person and a run report are written to a new folder. The page for a person (`for-a-person.txt`) lists the notes, the rejected items, the missing customers and the rejected notes with the real names; the run report keeps stand-ins only. A run summary, with stand-ins only, can be sent to an automation trigger (an n8n or Make webhook) on the same computer. If the webhook fails, the outputs are kept and the run says so.
+1. **The personal columns never reach the model.** `pipeline.py` checks the sheet first and refuses it before anything is sent if a column is missing or an amount or a delay is not a plain number. Names, identity numbers, phones, e-mail addresses and street addresses become stand-ins such as `Customer 001`; the notes are scrubbed; a last guard refuses the run if a personal value is still in the request.
+2. **What was already drafted is left out.** With `--history`, a customer whose draft was approved and exported in the last seven days (`--window-days`), with the same total, is not asked about again. A changed total is drafted again and marked. When everyone owing was already drafted, the model is not called at all.
+3. **Every figure the model writes in digits is checked against the sheet.** The total and the days late must match exactly; a reminder may name only its own customer and state only its total and delay. Anything that fails is rejected and listed for a person. Each customer's ageing bucket (current, 1-30, 31-60, 61-90, over 90) is computed from the sheet, not asked of the model.
+4. **A person decides.** `approval.py` records an approval or a rejection for each draft, with who and when, and exports only the approved ones, together with a line in the run history. It refuses decisions from another run and drafts changed after they were written.
+5. **A person reads one page.** `report.py` writes a self-contained HTML page: the figures, the ageing, the call list with each decision, the drafts, what was refused, and what was already drafted.
 
-**Nothing is sent to any customer.** The pipeline has no send step at all, which is why the run report's `sent_to_customers` is always 0. The output is a draft for a person to read and approve.
+**Nothing is sent to any customer.** There is no send step anywhere, and every run report says `"sent_to_customers": 0`. The design, and why it is this way, is in [`docs/DESIGN.md`](docs/DESIGN.md).
 
-## Run it
+## What is real here
 
-Python 3.13, standard library only. Nothing to install.
+| Path | Kind | What was actually run |
+|---|---|---|
+| The model answer the demo replays (`recorded-answer.json`) | Recorded | At this commit it is a **placeholder constructed from the sheet's own figures**, not a model's answer, and its meta file says so; it is to be replaced by a real model recording. One real answer from a Claude model, to the first version's six-row sheet, is kept in `fixtures/` with the sha256 of the request it answers. |
+| The live model path (`--backend anthropic`) | Mock | Tested against a local mock of the Messages API on 127.0.0.1, never against the real service |
+| The webhook (`--webhook`) | Mock | Tested against a local mock server; no real n8n or Make instance was called |
+| The pipeline, the checks, the run history, the approval, the report, the demo | Local | They run on the reader's computer: `python -I run_tests.py` and `python -I demo.py --out out-demo` |
 
-```
-python -I test_pipeline.py
-python -I pipeline.py --out out-run
-python -I pipeline.py --print-request
-```
+## What can go wrong, and what happens
 
-The first command runs the tests. The second runs the pipeline on the synthetic sheet with the recorded model answer and writes into a new folder (it refuses to overwrite an existing one). The third prints the exact text a model would receive (UTF-8, with LF line ends), so you can see for yourself that no personal value is in it.
+The wrong answers and broken sheets in [`gallery/`](gallery/README.md) are constructed, not recorded: each is the recorded answer or the shipped sheet with one change, and `gallery/README.md` says which.
 
-On the recorded answer the run prints:
-
-```
-backend recorded | owing 4 | accepted 4 | rejected 0 | missing 0 | rejected notes 0 | sent to customers 0
-```
-
-The exit code is 0 when the run is done; 2 when it is refused for a usage or setup reason (for example a missing file, an existing output folder, a sheet that fails its check, or a personal value in the request); 3 when the model's answer or the API cannot be used, in which case nothing is written; and 4 when the outputs were written but the webhook failed.
-
-The live path is `--backend anthropic`. It reads the key from the `ANTHROPIC_API_KEY` environment variable and never prints or writes it.
-
-## Files
-
-| File | What it is |
-|---|---|
-| `pipeline.py` | The pipeline: the sheet check, the model request, the checks, the mapping back, the outputs |
-| `pseudonymise.py` | Replaces the personal columns of a table with stable stand-ins, scrubs the other columns, and keeps a local key |
-| `prompt.txt` | The fixed prompt |
-| `customers.synthetic.csv` | The invented sheet: six rows, five invented customers, one of them on two rows |
-| `recorded-answer.json` | One real answer from a Claude model to the printed request, saved unedited |
-| `recorded-answer.meta.json` | Where the recorded answer came from: the model, the date, the route, and the sha256 of the request it answers. A test compares that sha256 with the request the pipeline builds today, so a changed prompt or sheet cannot silently keep an old recording |
-| `test_pipeline.py` | The tests |
-
-## What the tests cover
-
-44 tests, 0 failures (`python -I test_pipeline.py`, Python 3.13). They also run on every push to main and on pull requests; the badge above shows the last result. One of them runs the recorded answer through the checks.
-
-- the sheet is checked before anything is sent: a missing column (a header spelled `Name` included), an amount such as `4,200`, `-5` or an empty cell, a delay such as `45.0`, or an empty name is refused with the row and the column, and the model is not called;
-- a missing sheet, prompt or recorded answer is refused;
-- the model request carries no personal value and only the four needed columns, and its table is written by the csv module (quotes kept, a line break turned into a space);
-- the pseudonymiser: the three patterns catch a phone, an e-mail address and a nine-digit number outside their columns; the sheet's own values are replaced as whole words in any letter case, longest first; a value written differently gets through, as the limits below say; its command line writes the clean sheet and the key, and refuses to overwrite;
-- the leak guard refuses a request that still holds a personal value, before anything is sent;
-- a correct answer is accepted whole;
-- amounts are exact decimals: rows of 0.1 and 0.2 total 0.3, and 12345.67 and 1234567.89 are written and quoted as they are;
-- a wrong total, wrong days late, a repeated or zero priority, the same customer twice, an item that is not an object, an invented customer and a paid-up customer are each rejected with the reason;
-- a figure of the wrong kind is rejected: an amount written as text or as `true`, days late or a priority with a fraction or as `true`; a NaN or an infinity refuses the whole answer;
-- a reminder that is empty, leaves out the total, states another figure, or holds another stand-in is rejected with what it is;
-- a reason that states a figure that is not the customer's own, or names a stand-in from outside the customer's rows, is rejected;
-- a note for a person with a figure that is not in the sheet, an unknown stand-in, or a value that is not text is set aside and listed;
-- stand-ins are matched as exact tokens, so `Customer 1001` works in a sheet of more than 999 customers;
-- a left-out customer is listed as missing;
-- the page for a person carries the real names; the run report and the webhook payload carry stand-ins only;
-- a fenced JSON answer is read; prose, a missing call list and a `for_a_human` that is not a list are refused, and an unusable answer writes nothing;
-- an existing folder is never overwritten;
-- the API path against a local mock of the Messages API: the right path, version header, model, `max_tokens` and key, and no personal value in the body; an HTTP error, a connection error, a body that is not JSON or not in the expected shape, and an answer cut off at `max_tokens` are each refused with nothing written;
-- no key gives a clear refusal and nothing is written;
-- the webhook receives stand-ins only; a webhook outside this computer is refused before anything runs; a failed webhook keeps the outputs and exits with 4;
-- `--print-request` prints the exact request and needs no `--out`; every other run does;
-- `recorded-answer.meta.json` has its four keys, and its sha256 matches the request built today.
+| Case | What goes wrong | What happens | Command |
+|---|---|---|---|
+| `happy-path` | Nothing: some drafts approved, one rejected | exit 0; the export holds only the approved drafts | `python -I demo.py --case happy-path --out out-demo` |
+| `bad-sheet` | An amount written `4,200` | refused before anything is sent, exit 2, nothing written | `python -I demo.py --case bad-sheet --out out-demo` |
+| `wrong-total` | The model's total differs from the sheet's | that item rejected with the reason; the others kept | `python -I demo.py --case wrong-total --out out-demo` |
+| `invented-customer` | The model adds a customer who is not in the sheet | rejected | `python -I demo.py --case invented-customer --out out-demo` |
+| `leak-guard` | A personal value still in the request | refused, exit 2, nothing sent | `python -I demo.py --case leak-guard --out out-demo` |
+| `second-run` | The same sheet again inside the window, after an export | nothing is drafted twice; the model is not called | `python -I demo.py --case second-run --out out-demo` |
+| `no-approval` | An export with no decision | nothing exported | `python -I demo.py --case no-approval --out out-demo` |
+| `foreign-decisions` | A decisions file from another run | refused, exit 2 | `python -I demo.py --case foreign-decisions --out out-demo` |
+| `api-error` | The live path against a local mock that answers 500 | refused, exit 3, nothing written | `python -I demo.py --case api-error --out out-demo` |
+| `webhook-down` | The webhook is unreachable | outputs kept, exit 4 | `python -I demo.py --case webhook-down --out out-demo` |
 
 ## Limits, stated plainly
 
-- **Synthetic data.** Every customer is invented, every e-mail address is at example.com, and the identity numbers and phone numbers are placeholders. No real person or business is in any file.
-- **The live API path was tested against a local mock, not against the real service.** The mock answers in the documented shape of the Messages API.
+- **Synthetic data.** Every customer is an invented business whose name ends in "(invented)", every e-mail address is at example.com, and the identity numbers and phone numbers are placeholders. No real person or business is in any file.
+- **At this commit there is no real model answer to the shipped sheet.** The recorded answer is a constructed placeholder until a real recording is made; a test ties any recording to the exact request by its sha256.
 - **One recorded model answer is not a measure of reliability.** Another run may order the list differently or make a mistake. The checks catch wrong figures and invented customers. They do not judge whether the order is wise; that stays with a person.
+- **The live API path was tested against a local mock, not against the real service.** The mock answers in the documented shape of the Messages API.
 - **Figures are checked only when they are written in digits.** A number written in words, such as "thirty days", is not checked.
-- **The pseudonymiser is a teaching aid, not a privacy product.** The personal columns never reach the model, but inside a note it finds only the sheet's own values, written the same way, and three common patterns. A name or a number written differently gets through: a note that says "call Alpha's brother on 000.000.0001" reaches the model as it is. It makes no legal claim.
+- **The pseudonymiser is a teaching aid, not a privacy product.** Inside a note it finds only the sheet's own values, written the same way, and three common patterns. A name or a number written differently gets through. It makes no legal claim.
 - **Customers are told apart by the name column alone.** Two different people with the same name become one customer, and their rows are added together.
+- **The approval records a name and does not authenticate.** `--by` is whatever the person types.
+- **The history key is a hash, and a hash of a name is not anonymous.** The history file holds no name, but anyone who has the sheet can compute the same key, and a guessed name can be tested against it.
+- **Ageing is computed from the sheet's own delay column.** It is as current as that column, not worked out from invoice dates.
+- **A changed draft is detected, not prevented.** The check guards against accidents, not against someone who also edits the run report.
 - **The webhook was tested against a local mock server.** No real n8n or Make instance was called.
 - This is a demonstration of a design, not a product and not a record of client work.
 
-## The design in one line
+## How this was built
 
-The AI drafts, a script verifies, a person approves.
+Written with Claude Code under the author's direction. Every claim on this page is backed by a test or a command the reader can run: the tests are listed in [`docs/TESTS.md`](docs/TESTS.md).
+
+[![tests](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml/badge.svg)](https://github.com/evgenybl/ai-collections-followup-demo/actions/workflows/tests.yml)
+
+## Origins
+
+The first version of this demo had a six-row sheet and one real model answer to it; both are kept in `fixtures/`, with the tests written for them. The design in one line has not changed: the AI drafts, a script verifies, a person approves.
 
 ## Licence
 
