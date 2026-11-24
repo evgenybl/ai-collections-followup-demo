@@ -175,10 +175,10 @@ Tests of the generated sheet (make_sheet.py), the ageing buckets, and the shippe
 
 ### AgeingTest
 
-- the bucket comes from the largest delay among open rows
 - the bucket is in the call list and the run report
 - the bucket is never sent to the model
 - the buckets at their edges
+- the delay and the bucket come from the rows that still owe money
 
 ### RecordedAnswerTest
 

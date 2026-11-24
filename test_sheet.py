@@ -98,12 +98,19 @@ class AgeingTest(TempTest):
                              (61, "61-90"), (90, "61-90"), (91, "over 90"), (400, "over 90")]:
             self.assertEqual(pipeline.ageing_bucket(days), bucket, days)
 
-    def test_the_bucket_comes_from_the_largest_delay_among_open_rows(self):
+    def test_the_delay_and_the_bucket_come_from_the_rows_that_still_owe_money(self):
         sheet = self.write("sheet.csv", "name,amount_due,days_late,notes\nAlpha Shop,100,10,\nAlpha Shop,0,95,\n"
                                         "Beta Shop,50,0,\nGamma Shop,0,40,\n")
-        expected = pipeline.prepare(sheet, PROMPT)["expected"]
-        self.assertEqual(expected["Customer 001"]["days"], 95)        # the check of days_late still uses every row
-        self.assertEqual(pipeline.bucket_of(expected["Customer 001"]), "1-30")   # the paid row is not open
+        prep = pipeline.prepare(sheet, PROMPT)
+        expected = prep["expected"]
+        self.assertEqual(expected["Customer 001"]["days"], 10)        # the paid row's older delay is not the delay
+        self.assertEqual(pipeline.bucket_of(expected["Customer 001"]), "1-30")
+        item = {"customer": "Customer 001", "priority": 1, "amount": 100, "days_late": 10,
+                "reason": "a paid invoice was 95 days late", "reminder": "Dear Customer 001, 100 is 10 days late."}
+        accepted, rejected, *_ = pipeline.validate({"call_list": [item]}, expected, prep["key"])
+        self.assertEqual((len(accepted), rejected), (1, []))
+        _, rejected, *_ = pipeline.validate({"call_list": [dict(item, days_late=95)]}, expected, prep["key"])
+        self.assertEqual([r["reason"] for r in rejected], ["days late 95 does not match the sheet's 10"])
         self.assertEqual(pipeline.bucket_of(expected["Customer 002"]), "current")
         ageing = {b["bucket"]: b for b in pipeline.ageing(expected)}
         self.assertEqual(ageing["1-30"], {"bucket": "1-30", "customers": ["Customer 001"], "total": "100"})

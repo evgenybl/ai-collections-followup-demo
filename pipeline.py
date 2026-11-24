@@ -163,18 +163,17 @@ def numbers_in(text, stand_ins):
 
 
 def expected_by_customer(clean_rows, key):
-    """Per stand-in, from the sheet itself: the total debt, the largest delay, the largest delay among the open rows
-    (an amount above 0; the ageing bucket comes from it), every figure of the customer's own rows (each amount and
-    delay, and the total), and the stand-ins those rows hold."""
+    """Per stand-in, from the sheet itself: the total debt; the largest delay among the rows that still owe money (an
+    amount above 0), which the answer's days_late must equal and the ageing bucket comes from; every figure of the
+    customer's own rows (each amount and delay, and the total); and the stand-ins those rows hold. A paid row's delay
+    is a figure of the customer's, but not their delay."""
     out = {}
     for row in clean_rows:
         amount, days = Decimal(row[AMOUNT].strip()), int(row[DAYS].strip())
-        c = out.setdefault(row[NAME], {"total": Decimal(0), "days": 0, "open_days": 0, "figures": set(),
-                                       "stand_ins": set()})
+        c = out.setdefault(row[NAME], {"total": Decimal(0), "days": 0, "figures": set(), "stand_ins": set()})
         c["total"] += amount
-        c["days"] = max(c["days"], days)
         if amount > 0:
-            c["open_days"] = max(c["open_days"], days)
+            c["days"] = max(c["days"], days)
         c["figures"] |= {amount, Decimal(days)}
         for value in row.values():
             if isinstance(value, str):
@@ -569,7 +568,7 @@ def webhook_result(url, payload, allow_remote):
 
 def bucket_of(c):
     """The ageing bucket of one customer of expected_by_customer."""
-    return ageing_bucket(c["open_days"])
+    return ageing_bucket(c["days"])
 
 
 def ageing(expected):
