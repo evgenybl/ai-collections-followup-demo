@@ -170,14 +170,26 @@ class HistoryTest(TempTest):
         self.assertFalse((self.base / "run").exists())
 
     def test_the_history_key_is_a_hash_and_holds_no_name(self):
-        key = pipeline.customer_key("  Maple   Bakery (invented) ", ["000-000-001 "])
-        self.assertEqual(key, pipeline.customer_key("maple bakery (INVENTED)", ["000000001"]))
+        key = pipeline.customer_key(" Maple Bakery (invented) ", [" 000000001"])
+        self.assertEqual(key, pipeline.customer_key("Maple Bakery (invented)", ["000000001"]))  # the ends, as grouped
         self.assertNotEqual(key, pipeline.customer_key("Maple Bakery (invented)", ["000000002"]))
         self.assertNotEqual(key, pipeline.customer_key("Maple Florist (invented)", ["000000001"]))
         self.assertRegex(key, r"^[0-9a-f]{64}$")
         rows, _ = pipeline.load_sheet(SHEET)
         row = next(r for r in rows if r["name"] == self.real_name)
         self.assertEqual(self.prep["customer_keys"][self.who], pipeline.customer_key(row["name"], [row["id_number"]]))
+
+    def test_two_spellings_of_a_name_are_two_customers_in_the_history_too(self):
+        sheet = self.write("two.csv", "name,id_number,amount_due,days_late,notes\nAcme Works,000000001,100,5,\n"
+                                      "ACME  Works,000000001,100,5,\n")
+        prep = pipeline.prepare(sheet, PROMPT)
+        keys = prep["customer_keys"]
+        self.assertEqual(sorted(prep["key"].values())[:2], ["000000001", "ACME  Works"])
+        self.assertNotEqual(keys["Customer 001"], keys["Customer 002"])
+        line = json.dumps({"customer_key": keys["Customer 001"], "exported_on": days_before(1), "total": "100",
+                           "request_sha256": "ab" * 32})
+        records = pipeline.read_history(self.history(line), AS_OF)
+        self.assertEqual(list(pipeline.prepare(sheet, PROMPT, records, AS_OF)["already_drafted"]), ["Customer 001"])
 
     def test_bad_dates_and_windows_are_refused_by_the_command_line(self):
         answer = self.answer_file(constructed_answer(self.prep))

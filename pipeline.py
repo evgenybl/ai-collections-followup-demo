@@ -61,7 +61,7 @@ MAX_TOKENS = 4096
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 BUCKETS = ("current", "1-30", "31-60", "61-90", "over 90")
 DEFAULT_WINDOW_DAYS = 7
-HISTORY_KEY_PREFIX = "ai-collections-followup-demo history key v1"
+HISTORY_KEY_PREFIX = "ai-collections-followup-demo history key v2"
 HISTORY_FIELDS = ("customer_key", "exported_on", "total", "request_sha256")
 
 PLAIN_AMOUNT = re.compile(r"[0-9]+(?:\.[0-9]+)?")   # 4200 or 4200.50; not 4,200, -5 or 1e3
@@ -246,11 +246,12 @@ def positive_whole(text):
 
 
 def customer_key(name, id_numbers):
-    """The run history's key for a customer: a sha256 over a fixed prefix, the name (spaces collapsed, letter case
-    ignored) and the identity numbers (spaces and hyphens removed). The history file holds no name, but the key is
-    not anonymous: anyone who has the sheet can compute it again."""
-    ids = sorted({re.sub(r"[\s-]", "", i) for i in id_numbers} - {""})
-    text = "\n".join([HISTORY_KEY_PREFIX, " ".join(name.split()).casefold(), ",".join(ids)])
+    """The run history's key for a customer: a sha256 over a fixed prefix, the name exactly as the pipeline tells
+    customers apart by it (the name column as written, without spaces at its ends) and the identity numbers as
+    written. Nothing else is normalised, so "Acme Works" and "ACME  Works" are two customers here as everywhere. The
+    history file holds no name, but the key is not anonymous: anyone who has the sheet can compute it again."""
+    ids = sorted({i.strip() for i in id_numbers} - {""})
+    text = "\n".join([HISTORY_KEY_PREFIX, name.strip(), ",".join(ids)])
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
