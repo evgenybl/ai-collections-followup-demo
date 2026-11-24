@@ -1,0 +1,27 @@
+For a person to read. It holds real names: keep it on this computer.
+
+Notes from the model:
+- Quarry Laundry (invented) asked to pay in instalments; a person must decide whether to accept, and on what terms.
+- Cobalt Bakery (invented) disputes an invoice; a person should settle the dispute before any reminder goes out.
+- Lantern Locksmiths (invented) promised to pay by the end of the month; a person should check whether the promise is kept.
+- Bramble Framing (invented) promised to pay by the end of the month; a person should check whether the promise is kept.
+- Juniper Tile Works (invented) says an invoice never arrived; a person should check that it was sent before any reminder.
+- Linden Florist (invented) asked to pay in instalments; a person must decide whether to accept, and on what terms.
+- Sorrel Bookbinding (invented) says an invoice never arrived; a person should check that it was sent before any reminder.
+- Willow Garden Supplies (invented) does not answer the phone; a person should confirm the e-mail address before writing.
+- Granite Upholstery (invented) asked to pay in instalments; a person must decide whether to accept, and on what terms.
+- Meadow Print Shop (invented) does not answer the phone; a person should confirm the e-mail address before writing.
+- Riverbend Bicycle Repairs (invented) does not answer the phone; a person should confirm the e-mail address before writing.
+- Granite Print Shop (invented) promised to pay by the end of the month; a person should check whether the promise is kept.
+- Kestrel Florist (invented) disputes an invoice; a person should settle the dispute before any reminder goes out.
+- Orchard Bicycle Repairs (invented) says an invoice never arrived; a person should check that it was sent before any reminder.
+
+Items rejected by the checks (not in the call list):
+- none
+
+Customers who owe money and are missing from the answer:
+- none
+
+Notes rejected by the checks:
+- none
+

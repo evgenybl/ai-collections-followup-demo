@@ -1,0 +1,27 @@
+{
+ "request_sha256": "b78d46470f5f6128ab7d8882133153a8f2133309e7f65e7f0f114ce674730a49",
+ "drafts_sha256": "3e8d35cdda42eea65bda7c54c2bf4ec9b7c34cd788fe9b4f898729a62ab06ab8",
+ "decisions": [
+  {
+   "item": 3,
+   "decision": "approved",
+   "by": "Reviewer One (invented)",
+   "at": "2026-11-24T09:00:00Z",
+   "reason": null
+  },
+  {
+   "item": 6,
+   "decision": "approved",
+   "by": "Reviewer One (invented)",
+   "at": "2026-11-24T09:01:00Z",
+   "reason": null
+  },
+  {
+   "item": 1,
+   "decision": "rejected",
+   "by": "Reviewer One (invented)",
+   "at": "2026-11-24T09:02:00Z",
+   "reason": "Hold until the note for a person about this customer is dealt with"
+  }
+ ]
+}

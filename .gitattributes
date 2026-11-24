@@ -1,1 +1,5 @@
 * text=auto eol=lf
+
+# The call lists in examples/ are the pipeline's real output, which the csv module writes with CRLF line ends. They
+# are kept byte for byte, so that the sha256 of each in examples/run-report.json stays true on every system.
+examples/**/*.csv -text

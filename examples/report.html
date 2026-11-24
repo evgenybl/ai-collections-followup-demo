@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collections run as of 2026-11-24</title>
+<style>
+:root { --ink: #1f2933; --muted: #52606d; --line: #d9e2ec; --soft: #f5f7fa; --bar: #486581; --bar-edge: #243b53;
+  --approved: #1f6f43; --rejected: #9b2c2c; --pending: #7a5b00; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #ffffff; color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+main { max-width: 64rem; margin: 0 auto; padding: 1rem; }
+h1 { font-size: 1.5rem; line-height: 1.25; margin: .5rem 0; }
+h2 { font-size: 1.2rem; margin: 2rem 0 .75rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); }
+h3 { font-size: 1rem; margin: 1rem 0 .25rem; }
+.meta { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0; color: var(--muted); }
+.tag { border: 1px solid var(--line); border-radius: 1rem; padding: 0 .6rem; background: var(--soft); }
+.warning { border-left: 4px solid var(--pending); padding: .5rem .75rem; background: var(--soft); }
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; }
+.figure { border: 1px solid var(--line); border-radius: .5rem; padding: .75rem; }
+.figure span { display: block; color: var(--muted); font-size: .9rem; }
+.figure b { display: block; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.bar-row { display: grid; grid-template-columns: 5rem 1fr 13rem; gap: .75rem; align-items: center; margin: .4rem 0; }
+.track { display: block; height: 1.25rem; background: var(--soft); border: 1px solid var(--line); }
+.bar { display: block; height: 100%; min-width: 1px; background: var(--bar); border-right: 2px solid var(--bar-edge);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.value { font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; vertical-align: top; padding: .45rem .5rem; border-bottom: 1px solid var(--line); }
+th { font-size: .85rem; color: var(--muted); }
+td.number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.state { font-weight: 600; }
+.approved { color: var(--approved); } .rejected { color: var(--rejected); } .pending { color: var(--pending); }
+.changed { display: block; font-size: .85rem; color: var(--pending); }
+.draft { border: 1px solid var(--line); border-radius: .5rem; padding: .5rem .75rem; margin: .75rem 0; }
+.draft h3 { margin-top: .25rem; }
+pre { white-space: pre-wrap; font: inherit; margin: .5rem 0; padding: .5rem; background: var(--soft); }
+footer { margin-top: 2.5rem; padding-top: .75rem; border-top: 1px solid var(--line); color: var(--muted); }
+footer p { margin: .25rem 0; }
+.sent { color: var(--ink); font-weight: 700; }
+@media (max-width: 40rem) {
+  .bar-row { grid-template-columns: 4.5rem 1fr; }
+  .bar-row .value { grid-column: 2; }
+}
+@media print {
+  body { font-size: 11pt; }
+  main { max-width: none; padding: 0; }
+  .scroll { overflow: visible; }
+  .draft, .figure, .bar-row, tr { break-inside: avoid; }
+  h2 { break-after: avoid; }
+}
+</style>
+</head>
+<body>
+<main>
+<header id="header">
+<p class="meta"><span class="tag">Synthetic data</span><span class="tag">Recorded</span><span class="tag">As of 2026-11-24</span></p>
+<h1>Collections follow-up: drafts for a person to decide</h1>
+<p class="warning">This page holds real names (in this demo every name is invented). Keep it on this computer, as you would keep for-a-person.txt.</p>
+</header>
+<section id="figures" class="figures" aria-label="In figures">
+<div class="figure"><span>Customers owing</span><b>22</b></div>
+<div class="figure"><span>Total owed</span><b>290,879.90</b></div>
+<div class="figure"><span>Drafts waiting for a decision</span><b>19</b></div>
+<div class="figure"><span>Items the checks refused</span><b>0</b></div>
+</section>
+<section id="ageing">
+<h2>What is owed, by how late it is</h2>
+<div class="bar-row"><span>current</span><span class="track"><span class="bar" style="width: 16.1%"></span></span><span class="value">46,932.35 &middot; 3 customers</span></div>
+<div class="bar-row"><span>1-30</span><span class="track"><span class="bar" style="width: 41.5%"></span></span><span class="value">120,628.15 &middot; 7 customers</span></div>
+<div class="bar-row"><span>31-60</span><span class="track"><span class="bar" style="width: 20.4%"></span></span><span class="value">59,387.55 &middot; 6 customers</span></div>
+<div class="bar-row"><span>61-90</span><span class="track"><span class="bar" style="width: 12.3%"></span></span><span class="value">35,836.50 &middot; 3 customers</span></div>
+<div class="bar-row"><span>over 90</span><span class="track"><span class="bar" style="width: 9.7%"></span></span><span class="value">28,095.35 &middot; 3 customers</span></div>
+<p>The bucket of each customer comes from the largest delay among their open invoices in the sheet. &ldquo;current&rdquo; means not late yet.</p>
+</section>
+<section id="call-list">
+<h2>Call list, in priority order</h2>
+<div class="scroll"><table>
+<thead><tr><th>#</th><th>Customer</th><th>Total</th><th>Days late</th><th>Bucket</th><th>Why at this place (the model's reason)</th><th>Decision</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Quarry Laundry (invented)</td><td class="number">13,585</td><td class="number">98</td><td>over 90</td><td>A balance of 13,585; the oldest open invoice is 98 days late.</td><td><span class="state rejected">Rejected by Reviewer One (invented) at 2026-11-24T09:02:00Z: Hold until the note for a person about this customer is dealt with</span></td></tr>
+<tr><td>2</td><td>Cobalt Bakery (invented)</td><td class="number">12,295</td><td class="number">123</td><td>over 90</td><td>A balance of 12,295; the oldest open invoice is 123 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>3</td><td>Cobalt Florist (invented)</td><td class="number">2,215.35</td><td class="number">173</td><td>over 90</td><td>A balance of 2,215.35; the oldest open invoice is 173 days late.</td><td><span class="state approved">Approved by Reviewer One (invented) at 2026-11-24T09:00:00Z</span></td></tr>
+<tr><td>4</td><td>Lantern Locksmiths (invented)</td><td class="number">14,171.50</td><td class="number">64</td><td>61-90</td><td>A balance of 14,171.50; the oldest open invoice is 64 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>5</td><td>Bramble Framing (invented)</td><td class="number">13,995</td><td class="number">75</td><td>61-90</td><td>A balance of 13,995; the oldest open invoice is 75 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>6</td><td>Kestrel Bicycle Repairs (invented)</td><td class="number">7,670</td><td class="number">81</td><td>61-90</td><td>A balance of 7,670; the oldest open invoice is 81 days late.</td><td><span class="state approved">Approved by Reviewer One (invented) at 2026-11-24T09:01:00Z</span></td></tr>
+<tr><td>7</td><td>Juniper Tile Works (invented)</td><td class="number">21,655</td><td class="number">47</td><td>31-60</td><td>A balance of 21,655; the oldest open invoice is 47 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>8</td><td>Pebble Pottery (invented)</td><td class="number">12,910</td><td class="number">50</td><td>31-60</td><td>A balance of 12,910; the oldest open invoice is 50 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>9</td><td>Harbour Glass Studio (invented)</td><td class="number">7,770</td><td class="number">51</td><td>31-60</td><td>A balance of 7,770; the oldest open invoice is 51 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>10</td><td>Linden Florist (invented)</td><td class="number">7,401.60</td><td class="number">36</td><td>31-60</td><td>A balance of 7,401.60; the oldest open invoice is 36 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>11</td><td>Sorrel Bookbinding (invented)</td><td class="number">6,685.95</td><td class="number">55</td><td>31-60</td><td>A balance of 6,685.95; the oldest open invoice is 55 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>12</td><td>Willow Garden Supplies (invented)</td><td class="number">2,965</td><td class="number">45</td><td>31-60</td><td>A balance of 2,965; the oldest open invoice is 45 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>13</td><td>Granite Upholstery (invented)</td><td class="number">25,741.55</td><td class="number">5</td><td>1-30</td><td>A balance of 25,741.55; the oldest open invoice is 5 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>14</td><td>Meadow Print Shop (invented)</td><td class="number">22,545.35</td><td class="number">22</td><td>1-30</td><td>A balance of 22,545.35; the oldest open invoice is 22 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>15</td><td>Maple Locksmiths (invented)</td><td class="number">20,520</td><td class="number">16</td><td>1-30</td><td>A balance of 20,520; the oldest open invoice is 16 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>16</td><td>Riverbend Bicycle Repairs (invented)</td><td class="number">17,025.90</td><td class="number">18</td><td>1-30</td><td>A balance of 17,025.90; the oldest open invoice is 18 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>17</td><td>Thistle Catering (invented)</td><td class="number">15,760</td><td class="number">9</td><td>1-30</td><td>A balance of 15,760; the oldest open invoice is 9 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>18</td><td>Granite Print Shop (invented)</td><td class="number">14,240.35</td><td class="number">8</td><td>1-30</td><td>A balance of 14,240.35; the oldest open invoice is 8 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>19</td><td>Orchard Print Shop (invented)</td><td class="number">4,795</td><td class="number">27</td><td>1-30</td><td>A balance of 4,795; the oldest open invoice is 27 days late.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>20</td><td>Kestrel Florist (invented)</td><td class="number">34,256.40</td><td class="number">0</td><td>current</td><td>A balance of 34,256.40 that is not late yet.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>21</td><td>Maple Bakery (invented)</td><td class="number">12,345</td><td class="number">0</td><td>current</td><td>A balance of 12,345 that is not late yet.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+<tr><td>22</td><td>Orchard Bicycle Repairs (invented)</td><td class="number">330.95</td><td class="number">0</td><td>current</td><td>A balance of 330.95 that is not late yet.</td><td><span class="state pending">Waiting for a decision</span></td></tr>
+</tbody></table></div>
+</section>
+<section id="reminders">
+<h2>Reminder drafts</h2>
+<article class="draft"><h3>Item 1: Quarry Laundry (invented)</h3><p><span class="state rejected">Rejected by Reviewer One (invented) at 2026-11-24T09:02:00Z: Hold until the note for a person about this customer is dealt with</span></p><pre>Dear Quarry Laundry (invented), our records show an outstanding balance of 13,585, now 98 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 2: Cobalt Bakery (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Cobalt Bakery (invented), our records show an outstanding balance of 12,295, now 123 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 3: Cobalt Florist (invented)</h3><p><span class="state approved">Approved by Reviewer One (invented) at 2026-11-24T09:00:00Z</span></p><pre>Dear Cobalt Florist (invented), our records show an outstanding balance of 2,215.35, now 173 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 4: Lantern Locksmiths (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Lantern Locksmiths (invented), our records show an outstanding balance of 14,171.50, now 64 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 5: Bramble Framing (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Bramble Framing (invented), our records show an outstanding balance of 13,995, now 75 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 6: Kestrel Bicycle Repairs (invented)</h3><p><span class="state approved">Approved by Reviewer One (invented) at 2026-11-24T09:01:00Z</span></p><pre>Dear Kestrel Bicycle Repairs (invented), our records show an outstanding balance of 7,670, now 81 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 7: Juniper Tile Works (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Juniper Tile Works (invented), our records show an outstanding balance of 21,655, now 47 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 8: Pebble Pottery (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Pebble Pottery (invented), our records show an outstanding balance of 12,910, now 50 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 9: Harbour Glass Studio (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Harbour Glass Studio (invented), our records show an outstanding balance of 7,770, now 51 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 10: Linden Florist (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Linden Florist (invented), our records show an outstanding balance of 7,401.60, now 36 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 11: Sorrel Bookbinding (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Sorrel Bookbinding (invented), our records show an outstanding balance of 6,685.95, now 55 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 12: Willow Garden Supplies (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Willow Garden Supplies (invented), our records show an outstanding balance of 2,965, now 45 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 13: Granite Upholstery (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Granite Upholstery (invented), our records show an outstanding balance of 25,741.55, now 5 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 14: Meadow Print Shop (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Meadow Print Shop (invented), our records show an outstanding balance of 22,545.35, now 22 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 15: Maple Locksmiths (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Maple Locksmiths (invented), our records show an outstanding balance of 20,520, now 16 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 16: Riverbend Bicycle Repairs (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Riverbend Bicycle Repairs (invented), our records show an outstanding balance of 17,025.90, now 18 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 17: Thistle Catering (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Thistle Catering (invented), our records show an outstanding balance of 15,760, now 9 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 18: Granite Print Shop (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Granite Print Shop (invented), our records show an outstanding balance of 14,240.35, now 8 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 19: Orchard Print Shop (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Orchard Print Shop (invented), our records show an outstanding balance of 4,795, now 27 days late. Please arrange payment, or contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 20: Kestrel Florist (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Kestrel Florist (invented), a friendly note that a balance of 34,256.40 is open on your account. Please contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 21: Maple Bakery (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Maple Bakery (invented), a friendly note that a balance of 12,345 is open on your account. Please contact us if anything is unclear. Thank you.</pre></article>
+<article class="draft"><h3>Item 22: Orchard Bicycle Repairs (invented)</h3><p><span class="state pending">Waiting for a decision</span></p><pre>Dear Orchard Bicycle Repairs (invented), a friendly note that a balance of 330.95 is open on your account. Please contact us if anything is unclear. Thank you.</pre></article>
+</section>
+<section id="refused">
+<h2>What the checks refused</h2>
+<h3>Items refused (not in the call list)</h3>
+<p>None.</p>
+<h3>Customers who owe money and are missing from the answer</h3>
+<p>None.</p>
+<h3>Notes for a person that the checks refused</h3>
+<p>None.</p>
+</section>
+<section id="already-drafted">
+<h2>Already drafted</h2>
+<p>No run history was given for this run, so every owing customer was asked about.</p>
+</section>
+<section id="notes">
+<h2>Notes for a person</h2>
+<ul><li>Quarry Laundry (invented) asked to pay in instalments; a person must decide whether to accept, and on what terms.</li><li>Cobalt Bakery (invented) disputes an invoice; a person should settle the dispute before any reminder goes out.</li><li>Lantern Locksmiths (invented) promised to pay by the end of the month; a person should check whether the promise is kept.</li><li>Bramble Framing (invented) promised to pay by the end of the month; a person should check whether the promise is kept.</li><li>Juniper Tile Works (invented) says an invoice never arrived; a person should check that it was sent before any reminder.</li><li>Linden Florist (invented) asked to pay in instalments; a person must decide whether to accept, and on what terms.</li><li>Sorrel Bookbinding (invented) says an invoice never arrived; a person should check that it was sent before any reminder.</li><li>Willow Garden Supplies (invented) does not answer the phone; a person should confirm the e-mail address before writing.</li><li>Granite Upholstery (invented) asked to pay in instalments; a person must decide whether to accept, and on what terms.</li><li>Meadow Print Shop (invented) does not answer the phone; a person should confirm the e-mail address before writing.</li><li>Riverbend Bicycle Repairs (invented) does not answer the phone; a person should confirm the e-mail address before writing.</li><li>Granite Print Shop (invented) promised to pay by the end of the month; a person should check whether the promise is kept.</li><li>Kestrel Florist (invented) disputes an invoice; a person should settle the dispute before any reminder goes out.</li><li>Orchard Bicycle Repairs (invented) says an invoice never arrived; a person should check that it was sent before any reminder.</li></ul>
+</section>
+<footer id="footer">
+<p>Checked by a script: every figure the model wrote in digits, against the sheet; every stand-in, against this run; the request, for personal values, before the model was asked.</p>
+<p>Not checked: a figure written in words, whether the order of the calls is wise, and the tone of a reminder. A person decides those.</p>
+<p>A decision records the name a person gave. Nobody was authenticated.</p>
+<p class="sent">Nothing was sent to any customer.</p>
+</footer>
+</main>
+</body>
+</html>

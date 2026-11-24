@@ -1,0 +1,3 @@
+﻿priority,customer,amount,days_late,bucket,reason,approved_by,approved_at
+3,Cobalt Florist (invented),2215.35,173,over 90,"A balance of 2,215.35; the oldest open invoice is 173 days late.",Reviewer One (invented),2026-11-24T09:00:00Z
+6,Kestrel Bicycle Repairs (invented),7670,81,61-90,"A balance of 7,670; the oldest open invoice is 81 days late.",Reviewer One (invented),2026-11-24T09:01:00Z
