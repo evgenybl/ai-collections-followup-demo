@@ -124,6 +124,13 @@ class HistoryTest(TempTest):
             self.assertEqual((self.who in prep["already_drafted"], self.who in prep["amount_changed"]),
                              (left_out, not left_out))
 
+    def test_of_two_lines_of_the_same_date_the_later_in_the_file_counts(self):
+        for first, second, left_out in [(None, "1", False), ("1", None, True)]:
+            history = self.history(self.line(self.who, days_before(2), first), self.line(self.who, days_before(2),
+                                                                                         second))
+            prep = pipeline.prepare(SHEET, PROMPT, pipeline.read_history(history, AS_OF), AS_OF)
+            self.assertEqual(self.who in prep["already_drafted"], left_out, (first, second))
+
     def test_when_every_owing_customer_was_drafted_the_model_is_not_called(self):
         history = self.history(*[self.line(who, days_before(1)) for who in self.owing])
         spy = SpyBackend("this text would be refused if the model were asked")

@@ -290,6 +290,14 @@ class ApprovalTest(TempTest):
         self.assertEqual(code, 0)
         self.assertTrue(printed.startswith("exported items 1 to approved/ |"), printed)
 
+    def test_a_run_report_that_names_a_file_outside_the_run_is_refused(self):
+        for name in ("../outside.txt", "reminders/../../outside.txt", "notes.txt"):
+            data = dict(self.report, drafts_sha256=dict(self.report["drafts_sha256"], **{name: "0" * 64}))
+            (self.run_dir / "run-report.json").write_text(json.dumps(data), encoding="utf-8")
+            code, _, err = call_main(approval, ["list", str(self.run_dir)])
+            self.assertEqual(code, 2, name)
+            self.assertIn(f"run-report.json names an unexpected draft file: {name!r}", err)
+
     def test_an_export_appends_after_a_last_line_without_a_line_end(self):
         self.decide("approve", 1)
         earlier = self.report["drafts"][1]
@@ -330,7 +338,11 @@ class ApprovalTest(TempTest):
                                 (dict(data, decisions=[dict(data["decisions"][0], decision="rejected")]),
                                  "decision 1: a rejection has no reason"),
                                 (dict(data, decisions=[dict(data["decisions"][0], item=999)]),
-                                 "decision 1: item 999 is not a draft of this run")]:
+                                 "decision 1: item 999 is not a draft of this run"),
+                                (dict(data, decisions=[dict(data["decisions"][0], by="   ")]),
+                                 "decision 1: by is empty"),
+                                (dict(data, decisions=[dict(data["decisions"][0], at="2026-99-24T09:00:00Z")]),
+                                 "decision 1: at is not a UTC timestamp")]:
             (self.run_dir / "decisions.json").write_text(json.dumps(broken), encoding="utf-8")
             self.assert_refused_and_nothing_exported(self.export(), message)
 

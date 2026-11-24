@@ -105,10 +105,14 @@ class ReportTest(TempTest):
         self.assertNotIn("Approved by", before)
         call_main(approval, ["approve", str(run), "--item", "1", "--by", BY, "--at", AT])
         call_main(approval, ["reject", str(run), "--item", "2", "--by", BY, "--at", AT, "--reason", "<wait>"])
+        call_main(approval, ["approve", str(run), "--item", "3", "--by", "<b>Boss</b> & Co", "--at", AT])
         after = self.page(run)
-        self.assertEqual(self.figure(after, "Drafts waiting for a decision"), str(drafts - 2))
+        self.assertEqual(self.figure(after, "Drafts waiting for a decision"), str(drafts - 3))
         self.assertIn(f'<span class="state approved">Approved by {BY} at {AT}</span>', after)
         self.assertIn(f'<span class="state rejected">Rejected by {BY} at {AT}: &lt;wait&gt;</span>', after)
+        self.assertIn(f'<span class="state approved">Approved by &lt;b&gt;Boss&lt;/b&gt; &amp; Co at {AT}</span>',
+                      after)
+        self.assertNotIn("<b>Boss", after)
 
     def test_refusals_the_history_and_a_changed_amount_are_shown(self):
         prep = pipeline.prepare(SHEET, PROMPT)

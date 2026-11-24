@@ -61,15 +61,22 @@ def utc_now():
     return datetime.datetime.now(datetime.timezone.utc).strftime(TIMESTAMP_FORMAT)
 
 
+def valid_timestamp(text):
+    """Whether a text is a real UTC timestamp written 2026-11-24T09:00:00Z (month 99 or hour 25 is not)."""
+    if not isinstance(text, str) or not TIMESTAMP.fullmatch(text):
+        return False
+    try:
+        datetime.datetime.strptime(text, TIMESTAMP_FORMAT)
+    except ValueError:
+        return False
+    return True
+
+
 def check_timestamp(text):
     """A UTC timestamp written 2026-11-24T09:00:00Z, or a refusal (exit 2)."""
-    if TIMESTAMP.fullmatch(text or ""):
-        try:
-            datetime.datetime.strptime(text, TIMESTAMP_FORMAT)
-            return text
-        except ValueError:
-            pass
-    raise PipelineError(f"--at {text!r} is not a UTC timestamp written yyyy-mm-ddThh:mm:ssZ", 2)
+    if not valid_timestamp(text):
+        raise PipelineError(f"--at {text!r} is not a UTC timestamp written yyyy-mm-ddThh:mm:ssZ", 2)
+    return text
 
 
 def load_run(folder):
@@ -125,7 +132,7 @@ def entry_problem(entry, items):
         return f"decision {entry['decision']!r} is neither approved nor rejected"
     if not isinstance(entry["by"], str) or not entry["by"].strip():
         return "by is empty"
-    if not isinstance(entry["at"], str) or not TIMESTAMP.fullmatch(entry["at"]):
+    if not valid_timestamp(entry["at"]):
         return "at is not a UTC timestamp"
     if entry["decision"] == "rejected" and not (isinstance(entry["reason"], str) and entry["reason"].strip()):
         return "a rejection has no reason"

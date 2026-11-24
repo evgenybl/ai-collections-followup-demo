@@ -553,7 +553,7 @@ class RunTest(TempTest):
         self.assertEqual(headers["anthropic-version"], "2023-06-01")
         self.assertEqual(headers.get("x-api-key"), TEST_KEY)
         body = json.loads(seen["body"])
-        self.assertEqual((body["model"], body["max_tokens"]), ("claude-haiku-5-5", 4096))
+        self.assertEqual((body["model"], body["max_tokens"]), ("claude-haiku-5-5", 16000))
         self.assertEqual(body["messages"][0]["content"], pipeline.prepare(SHEET, PROMPT)["request"])
         for value in pipeline.personal_values(raw_rows()):
             self.assertNotIn(value, seen["body"])
@@ -563,7 +563,7 @@ class RunTest(TempTest):
         cases = [(dict(reply_text=good, status=500), "HTTP status 500"),
                  (dict(raw=b"<html>not json</html>"), "not JSON"),
                  (dict(raw=b'{"error": "no content"}'), "not in the shape"),
-                 (dict(reply_text=good, stop_reason="max_tokens"), "cut off at max_tokens (4096)")]
+                 (dict(reply_text=good, stop_reason="max_tokens"), "cut off at max_tokens (16000)")]
         for number, (settings, message) in enumerate(cases):
             server = MockServer(**settings)
             out = self.base / f"api-{number}"
