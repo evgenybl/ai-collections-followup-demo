@@ -42,7 +42,8 @@ export draft the same customers twice, in two folders, and nothing is sent eithe
 
 **Only the same total keeps a customer out.** If the total changed, the earlier reminder states a wrong figure now, so
 the customer is drafted again and marked "amount changed since the last draft". Of several history lines for a
-customer inside the window, the latest counts. A line dated after the run's date is refused rather than ignored or
+customer inside the window, the latest counts. The window has one definition, in the code's help and here: a
+draft exported fewer than N days before the as-of date, so ages 0 to N-1 (N is `--window-days`, 7 by default). A line dated after the run's date is refused rather than ignored or
 read as old: either the date of the run or the history is wrong, and the tool does not guess which.
 
 **Decisions are appended, never rewritten.** `decisions.json` is a record of who decided what and when. A changed mind

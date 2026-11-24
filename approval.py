@@ -256,8 +256,9 @@ def move_into_place(work, target):
 def export(folder, history=None, as_of=None):
     """Write approved/ with only the approved drafts, and append them to the run history. Returns a summary.
 
-    An approved item whose customer already has a history line inside the run's window (exported fewer than
-    window_days days before as_of) with the same total is not exported again, and is listed as already exported.
+    An approved item whose customer already has a history line inside the run's window (a draft exported fewer than
+    N days before the export's as-of date, so ages 0 to N-1, N being the run's window_days) with the same total is
+    not exported again, and is listed as already exported.
 
     Refused (exit 2), with nothing written: approved/ exists; decisions.json names another run; a draft was changed;
     the history file is corrupt or its folder does not exist. approved/ is built in a temporary folder, the history

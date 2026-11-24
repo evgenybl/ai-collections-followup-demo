@@ -75,7 +75,7 @@ $ python -I approval.py export out-run --history out-history.jsonl
 exported items 1 to approved/ | rejected 1 | pending 20 | history lines added 1 | sent to customers 0
 ```
 
-`out-run/approved/` now holds only the approved reminder and its call-list line. With `--history out-history.jsonl`, a run in the next seven days leaves that customer out of the request while the total stays the same. `python -I report.py out-run --out out-run.html` writes the page with the decisions on it.
+`out-run/approved/` now holds only the approved reminder and its call-list line. With `--history out-history.jsonl`, a later run leaves that customer out of the request while the export is inside the window and the total stays the same. `python -I report.py out-run --out out-run.html` writes the page with the decisions on it.
 
 Every test runs with `python -I run_tests.py`. The CI workflow runs the tests, the whole demo, and `make_examples.py` followed by a git comparison of what it wrote, on Linux and Windows with Python 3.11 and 3.13.
 
@@ -98,7 +98,7 @@ flowchart LR
 ```
 
 1. **The personal columns never reach the model.** `pipeline.py` checks the sheet first and refuses it before anything is sent if a column is missing or an amount or a delay is not a plain number. Names, identity numbers, phones, e-mail addresses and street addresses become stand-ins such as `Customer 001`; the notes are scrubbed; a last guard refuses the run if a personal value is still in the request.
-2. **What was already drafted is left out.** With `--history`, a customer whose draft was approved and exported in the last seven days (`--window-days`), with the same total, is not asked about again. A changed total is drafted again and marked. When everyone owing was already drafted, the model is not called at all.
+2. **What was already drafted is left out.** With `--history`, a customer whose draft was approved and exported inside the window, with the same total, is not asked about again. The window is a draft exported fewer than N days before the as-of date, so ages 0 to N-1 (N is `--window-days`, 7 by default). A changed total is drafted again and marked. When everyone owing was already drafted, the model is not called at all.
 3. **Every figure the model writes in digits is checked against the sheet.** The total and the days late must match exactly; a reminder may name only its own customer and state only its total and delay. Anything that fails is rejected and listed for a person. Each customer's ageing bucket (current, 1-30, 31-60, 61-90, over 90) is computed from the sheet, not asked of the model.
 4. **A person decides.** `approval.py` records an approval or a rejection for each draft, with who and when, and exports only the approved ones, together with a line in the run history. It refuses decisions from another run and drafts changed after they were written.
 5. **A person reads one page.** `report.py` writes a self-contained HTML page: the figures, the ageing, the call list with each decision, the drafts, what was refused, and what was already drafted.

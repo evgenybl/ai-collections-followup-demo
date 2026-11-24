@@ -2,7 +2,7 @@
 
 Written by `python -I make_examples.py` from the names of the tests; do not edit it by hand. Run every test with `python -I run_tests.py`; each file also runs on its own.
 
-142 tests in 7 files.
+143 tests in 7 files.
 
 ## test_approval.py
 
@@ -126,6 +126,7 @@ Tests of the run history: what an earlier export leaves out of the next request,
 - the history key is a hash and holds no name
 - the latest line inside the window counts
 - the window has a clear edge
+- the window has one definition everywhere
 - two spellings of a name are two customers in the history too
 - when every owing customer was drafted the model is not called
 - without history the run is as before

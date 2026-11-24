@@ -221,8 +221,8 @@ def page(report, states, person, rows, reminders):
     if report["history_lines"] is None:
         out.append("<p>No run history was given for this run, so every owing customer was asked about.</p>")
     else:
-        out += [f"<p>Exported in the {esc(report['window_days'])} days up to {esc(report['as_of'])} with the same "
-                "total, so left out of the request:</p>",
+        out += [f"<p>Already drafted ({esc(pipeline.window_rule(report['window_days'], report['as_of']))}), with the "
+                "same total, so left out of the request:</p>",
                 listed([f"{esc(r['customer'])}: drafted on {esc(r['drafted_on'])}, total {shown(r['total'])}"
                         for r in person["already_drafted"]]),
                 "<p>Drafted again, because the amount changed since the last draft:</p>",

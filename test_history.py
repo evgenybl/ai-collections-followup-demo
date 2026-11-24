@@ -6,6 +6,7 @@ import datetime
 import io
 import json
 import pathlib
+import re
 import sys
 import unittest
 
@@ -105,6 +106,21 @@ class HistoryTest(TempTest):
         page = (self.base / "run" / "for-a-person.txt").read_text(encoding="utf-8")
         self.assertIn(f"Drafted again: the amount changed since the last draft:\n- {self.real_name}: {total} now, "
                       f"1 when drafted on {days_before(2)}\n", page)
+
+    def test_the_window_has_one_definition_everywhere(self):
+        def flat(text):  # line breaks of a wrapped text do not count, nor one after a hyphen
+            return re.sub(r"-\s+", "-", " ".join(text.split()))
+
+        definition = pipeline.WINDOW_DEFINITION
+        self.assertEqual(definition, "a draft exported fewer than N days before the as-of date, so ages 0 to N-1")
+        self.assertIn(definition, flat(call_main(pipeline, ["--help"])[1]))
+        for path in (HERE / "README.md", HERE / "docs" / "DESIGN.md", HERE / "pipeline.py"):
+            self.assertIn(definition, flat(path.read_text(encoding="utf-8")), path.name)
+        history = self.history(self.line(self.who, days_before(3)))
+        self.run_main(self.answer_for(history), "--history", str(history))
+        page = (self.base / "run" / "for-a-person.txt").read_text(encoding="utf-8")
+        self.assertIn(f"Already drafted (exported fewer than 7 days before {AS_OF.isoformat()}, so ages 0 to 6 days), "
+                      "with the same total (left out of the request):", page)
 
     def test_the_window_has_a_clear_edge(self):
         window = pipeline.DEFAULT_WINDOW_DAYS

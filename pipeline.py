@@ -18,9 +18,10 @@ The steps, in order:
 Each owing customer's ageing bucket (current, 1-30, 31-60, 61-90, over 90) is computed here from the largest delay
 among their open rows. It is never stored in the sheet, and the model is neither asked for it nor told it.
 
-With --history, a run reads the run history that approval.py export writes. A customer exported inside the window
-(--window-days before --as-of) with the same total is left out of the request and listed as already drafted; one
-whose total changed is drafted again and marked. When every owing customer is already drafted, the model is not
+With --history, a run reads the run history that approval.py export writes. The window is a draft exported fewer
+than N days before the as-of date, so ages 0 to N-1 (N is --window-days, 7 by default). A customer with such a draft
+and the same total is left out of the request and listed as already drafted; one whose total changed is drafted
+again and marked. When every owing customer is already drafted, the model is not
 called at all. Without --history, every owing customer is asked about, as before.
 
 There is no step that sends anything to a customer. Standard library only. Run: python -I pipeline.py --help
@@ -70,6 +71,8 @@ MAX_TOKENS = 16000  # a wide margin for an answer on the shipped sheet: 22 reaso
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 BUCKETS = ("current", "1-30", "31-60", "61-90", "over 90")
 DEFAULT_WINDOW_DAYS = 7
+# The one definition of the window, in the code's help, the README and docs/DESIGN.md (a test holds them to it).
+WINDOW_DEFINITION = "a draft exported fewer than N days before the as-of date, so ages 0 to N-1"
 HISTORY_KEY_PREFIX = "ai-collections-followup-demo history key v2"
 HISTORY_FIELDS = ("customer_key", "exported_on", "total", "request_sha256")
 
@@ -312,6 +315,11 @@ def read_history(path, as_of):
             raise PipelineError(f"the history file, line {number}: {problem}", 2)
         records.append(dict(record, date=datetime.date.fromisoformat(record["exported_on"])))
     return records
+
+
+def window_rule(window_days, as_of):
+    """The window, in the one wording used everywhere, for a given number of days and date."""
+    return f"exported fewer than {window_days} days before {as_of}, so ages 0 to {window_days - 1} days"
 
 
 def latest_inside_window(history, as_of, window_days):
@@ -614,8 +622,8 @@ def page_for_a_person(rejected, missing, notes, rejected_notes, key, history=Non
     lines += section("Customers who owe money and are missing from the answer:", missing)
     lines += section("Notes rejected by the checks:", [f"{r['note']} ({r['reason']})" for r in rejected_notes])
     if history is not None:
-        drafted, changed, window_days, everyone, answered = history
-        lines += section(f"Already drafted in the last {window_days} days, with the same total (left out of the "
+        drafted, changed, window_days, everyone, answered, as_of = history
+        lines += section(f"Already drafted ({window_rule(window_days, as_of)}), with the same total (left out of the "
                          "request):", [f"{who}: drafted on {r['exported_on']}, total {r['total']}"
                                        for who, r in sorted(drafted.items())])
         lines += section("Drafted again: the amount changed since the last draft:",
@@ -766,7 +774,8 @@ def run(sheet, prompt_path, backend, out_dir, webhook=None, allow_remote_webhook
                        "days_late": a["days_late"], "bucket": bucket_of(prep["expected"][a["customer"]]),
                        "file": name, "customer_key": prep["customer_keys"][a["customer"]],
                        "amount_changed": a["customer"] in changed})
-    page_history = (drafted, changed, window_days, prep["everyone"], answered_drafted) if history is not None else None
+    page_history = ((drafted, changed, window_days, prep["everyone"], answered_drafted, as_of.isoformat())
+                    if history is not None else None)
     write_text(out_dir / "for-a-person.txt",
                page_for_a_person(rejected, missing, notes, rejected_notes, key, page_history, guarded) + "\n")
     # The same content, with the real names, in a form report.py can read without parsing the page.
@@ -855,8 +864,9 @@ def main(argv=None):
     ap.add_argument("--history", help="the run history (JSON lines, written by approval.py export); without it, "
                                       "every owing customer is asked about, as before")
     ap.add_argument("--as-of", type=iso_date, help="the run's date, yyyy-mm-dd (default: today)")
-    ap.add_argument("--window-days", type=positive_whole, default=DEFAULT_WINDOW_DAYS,
-                    help="a customer exported this many days ago or less, with the same total, is not drafted again")
+    ap.add_argument("--window-days", type=positive_whole, default=DEFAULT_WINDOW_DAYS, metavar="N",
+                    help=f"the window: {WINDOW_DEFINITION} (default {DEFAULT_WINDOW_DAYS}); a customer with such a draft "
+                         "and the same total is not drafted again")
     args = ap.parse_args(argv)
     if not args.out and not args.print_request:
         ap.error("--out is required, except with --print-request")
