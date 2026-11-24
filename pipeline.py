@@ -259,12 +259,13 @@ def read_history(path, as_of):
     records = []
     for number, line in enumerate(read_file(path, "the history file").splitlines(), start=1):
         try:
-            problem = history_problem(json.loads(line), as_of)
+            record = json.loads(line)
         except ValueError:
-            problem = "it is not JSON"
+            record, problem = None, "it is not JSON"
+        else:
+            problem = history_problem(record, as_of)
         if problem:
             raise PipelineError(f"the history file, line {number}: {problem}", 2)
-        record = json.loads(line)
         records.append(dict(record, date=datetime.date.fromisoformat(record["exported_on"])))
     return records
 
