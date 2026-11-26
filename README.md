@@ -1,6 +1,6 @@
 # AI Collections Follow-up
 
-A small business, or the office that keeps its books, chases unpaid invoices by hand every week, and one wrong figure in a reminder costs a customer's trust. This is a demonstration on invented data of another way: a model drafts the call list and the reminders, code checks every figure against the sheet, and a person approves each draft before it is exported; nothing is ever sent to a customer, and only when asked does anything leave the computer (the request to the model on the live path, and a run summary to a webhook).
+A small business, or the office that keeps its books, chases unpaid invoices by hand every week, and one wrong figure in a reminder costs a customer's trust. This is a demonstration on invented data of another way: a model drafts the call list and the reminders, code checks every figure against the sheet, and a person approves each draft before it is exported. Nothing is ever sent to a customer.
 
 ## What you see
 
